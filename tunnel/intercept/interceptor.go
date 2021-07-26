@@ -17,6 +17,7 @@
 package intercept
 
 import (
+	"fmt"
 	"github.com/openziti/edge/tunnel"
 	"github.com/openziti/edge/tunnel/dns"
 	"github.com/openziti/edge/tunnel/entities"
@@ -72,10 +73,15 @@ func (addr *InterceptAddress) Contains(ip net.IP, port uint16) bool {
 	return addr.cidr.Contains(ip) && port >= addr.lowPort && port <= addr.highPort
 }
 
+func (addr *InterceptAddress) String() string {
+	return fmt.Sprintf("cidr: %v, cidrAddr: %p, lowPort: %v, highPort: %v, protocol: %v, tproxySpec: %v, acceptSpec: %v",
+		addr.cidr, addr.cidr, addr.lowPort, addr.highPort, addr.protocol, addr.TproxySpec, addr.AcceptSpec)
+}
+
 func GetInterceptAddresses(service *entities.Service, protocol string, resolver dns.Resolver) ([]*InterceptAddress, error) {
 	var result []*InterceptAddress
 	for _, addr := range service.InterceptV1Config.Addresses {
-		_, cidr, err := getInterceptIP(addr, resolver)
+		_, cidr, err := getInterceptIP(service, addr, resolver)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get intercept IP address for %v", addr)
 		}

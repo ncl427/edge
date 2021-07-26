@@ -27,6 +27,13 @@ var _ PostureCheckSubType = &PostureCheckMacAddresses{}
 type PostureCheckMacAddresses struct {
 	MacAddresses []string
 }
+func (p *PostureCheckMacAddresses) GetTimeoutRemainingSeconds(_ string, _ *PostureData) int64 {
+	return PostureCheckNoTimeout
+}
+
+func (p *PostureCheckMacAddresses) GetTimeoutSeconds() int64 {
+	return PostureCheckNoTimeout
+}
 
 func (p *PostureCheckMacAddresses) FailureValues(_ string, pd *PostureData) PostureCheckFailureValues {
 	return &PostureCheckFailureValuesMac{

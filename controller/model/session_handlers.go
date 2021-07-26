@@ -84,6 +84,7 @@ func (handler *SessionHandler) Create(entity *Session) (string, error) {
 	failedPoliciesIdToName := map[string]string{}
 
 	var failedPolicyIds []string
+	var successPolicyIds []string
 
 	for policyId, policyPostureCheck := range policyPostureCheckMap {
 		policy, err := handler.GetEnv().GetHandlers().ServicePolicy.Read(policyId)
@@ -112,9 +113,8 @@ func (handler *SessionHandler) Create(entity *Session) (string, error) {
 		}
 
 		if len(failedChecks) == 0 {
-			//no failed check pass and exit
 			validPosture = true
-			break
+			successPolicyIds = append(successPolicyIds, policyId)
 		} else {
 			//save for error output
 			failedPolicies[policy.Id] = failedChecks
@@ -169,6 +169,8 @@ func (handler *SessionHandler) Create(entity *Session) (string, error) {
 	if result.Count < 1 {
 		return "", apierror.NewNoEdgeRoutersAvailable()
 	}
+
+	entity.ServicePolicies = successPolicyIds
 
 	return handler.createEntity(entity)
 }
@@ -286,19 +288,6 @@ func (handler *SessionHandler) querySessions(query ast.Query) (*SessionListResul
 		return nil, err
 	}
 	return result, nil
-}
-
-func (handler *SessionHandler) StreamAll(collect func(*Session, error) error) error {
-	return handler.env.GetDbProvider().GetDb().View(func(tx *bbolt.Tx) error {
-		for cursor := handler.Store.IterateIds(tx, ast.BoolNodeTrue); cursor.IsValid(); cursor.Next() {
-			current := cursor.Current()
-			apiSession, err := handler.readInTx(tx, string(current))
-			if err := collect(apiSession, err); err != nil {
-				return err
-			}
-		}
-		return collect(nil, nil)
-	})
 }
 
 func (handler *SessionHandler) ListSessionsForEdgeRouter(edgeRouterId string) (*SessionListResult, error) {

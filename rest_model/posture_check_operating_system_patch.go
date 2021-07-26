@@ -47,9 +47,9 @@ import (
 type PostureCheckOperatingSystemPatch struct {
 	nameField string
 
-	roleAttributesField Attributes
+	roleAttributesField *Attributes
 
-	tagsField Tags
+	tagsField *Tags
 
 	// operating systems
 	// Min Items: 1
@@ -67,23 +67,32 @@ func (m *PostureCheckOperatingSystemPatch) SetName(val string) {
 }
 
 // RoleAttributes gets the role attributes of this subtype
-func (m *PostureCheckOperatingSystemPatch) RoleAttributes() Attributes {
+func (m *PostureCheckOperatingSystemPatch) RoleAttributes() *Attributes {
 	return m.roleAttributesField
 }
 
 // SetRoleAttributes sets the role attributes of this subtype
-func (m *PostureCheckOperatingSystemPatch) SetRoleAttributes(val Attributes) {
+func (m *PostureCheckOperatingSystemPatch) SetRoleAttributes(val *Attributes) {
 	m.roleAttributesField = val
 }
 
 // Tags gets the tags of this subtype
-func (m *PostureCheckOperatingSystemPatch) Tags() Tags {
+func (m *PostureCheckOperatingSystemPatch) Tags() *Tags {
 	return m.tagsField
 }
 
 // SetTags sets the tags of this subtype
-func (m *PostureCheckOperatingSystemPatch) SetTags(val Tags) {
+func (m *PostureCheckOperatingSystemPatch) SetTags(val *Tags) {
 	m.tagsField = val
+}
+
+// TypeID gets the type Id of this subtype
+func (m *PostureCheckOperatingSystemPatch) TypeID() PostureCheckType {
+	return "OS"
+}
+
+// SetTypeID sets the type Id of this subtype
+func (m *PostureCheckOperatingSystemPatch) SetTypeID(val PostureCheckType) {
 }
 
 // UnmarshalJSON unmarshals this object with a polymorphic type from a JSON structure
@@ -107,9 +116,11 @@ func (m *PostureCheckOperatingSystemPatch) UnmarshalJSON(raw []byte) error {
 
 		Name string `json:"name,omitempty"`
 
-		RoleAttributes Attributes `json:"roleAttributes"`
+		RoleAttributes *Attributes `json:"roleAttributes,omitempty"`
 
-		Tags Tags `json:"tags"`
+		Tags *Tags `json:"tags,omitempty"`
+
+		TypeID PostureCheckType `json:"typeId"`
 	}
 	buf = bytes.NewBuffer(raw)
 	dec = json.NewDecoder(buf)
@@ -126,6 +137,11 @@ func (m *PostureCheckOperatingSystemPatch) UnmarshalJSON(raw []byte) error {
 	result.roleAttributesField = base.RoleAttributes
 
 	result.tagsField = base.Tags
+
+	if base.TypeID != result.TypeID() {
+		/* Not the type we're looking for. */
+		return errors.New(422, "invalid typeId value: %q", base.TypeID)
+	}
 
 	result.OperatingSystems = data.OperatingSystems
 
@@ -153,9 +169,11 @@ func (m PostureCheckOperatingSystemPatch) MarshalJSON() ([]byte, error) {
 	b2, err = json.Marshal(struct {
 		Name string `json:"name,omitempty"`
 
-		RoleAttributes Attributes `json:"roleAttributes"`
+		RoleAttributes *Attributes `json:"roleAttributes,omitempty"`
 
-		Tags Tags `json:"tags"`
+		Tags *Tags `json:"tags,omitempty"`
+
+		TypeID PostureCheckType `json:"typeId"`
 	}{
 
 		Name: m.Name(),
@@ -163,6 +181,8 @@ func (m PostureCheckOperatingSystemPatch) MarshalJSON() ([]byte, error) {
 		RoleAttributes: m.RoleAttributes(),
 
 		Tags: m.Tags(),
+
+		TypeID: m.TypeID(),
 	})
 	if err != nil {
 		return nil, err
@@ -199,11 +219,13 @@ func (m *PostureCheckOperatingSystemPatch) validateRoleAttributes(formats strfmt
 		return nil
 	}
 
-	if err := m.RoleAttributes().Validate(formats); err != nil {
-		if ve, ok := err.(*errors.Validation); ok {
-			return ve.ValidateName("roleAttributes")
+	if m.RoleAttributes() != nil {
+		if err := m.RoleAttributes().Validate(formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("roleAttributes")
+			}
+			return err
 		}
-		return err
 	}
 
 	return nil
@@ -282,11 +304,13 @@ func (m *PostureCheckOperatingSystemPatch) ContextValidate(ctx context.Context, 
 
 func (m *PostureCheckOperatingSystemPatch) contextValidateRoleAttributes(ctx context.Context, formats strfmt.Registry) error {
 
-	if err := m.RoleAttributes().ContextValidate(ctx, formats); err != nil {
-		if ve, ok := err.(*errors.Validation); ok {
-			return ve.ValidateName("roleAttributes")
+	if m.RoleAttributes() != nil {
+		if err := m.RoleAttributes().ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("roleAttributes")
+			}
+			return err
 		}
-		return err
 	}
 
 	return nil
@@ -294,9 +318,23 @@ func (m *PostureCheckOperatingSystemPatch) contextValidateRoleAttributes(ctx con
 
 func (m *PostureCheckOperatingSystemPatch) contextValidateTags(ctx context.Context, formats strfmt.Registry) error {
 
-	if err := m.Tags().ContextValidate(ctx, formats); err != nil {
+	if m.Tags() != nil {
+		if err := m.Tags().ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("tags")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *PostureCheckOperatingSystemPatch) contextValidateTypeID(ctx context.Context, formats strfmt.Registry) error {
+
+	if err := m.TypeID().ContextValidate(ctx, formats); err != nil {
 		if ve, ok := err.(*errors.Validation); ok {
-			return ve.ValidateName("tags")
+			return ve.ValidateName("typeId")
 		}
 		return err
 	}

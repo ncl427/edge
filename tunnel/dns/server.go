@@ -23,6 +23,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"net"
 	"net/url"
+	"os/exec"
+	"strings"
 	"sync"
 	"time"
 )
@@ -35,7 +37,23 @@ type resolver struct {
 	namesMtx sync.Mutex
 }
 
+func flushDnsCaches() {
+	bin, err := exec.LookPath("systemd-resolve")
+	if err != nil {
+		logrus.WithError(err).Warn("unable to find systemd-resolve in path, consider adding a dns flush to your restart process")
+		return
+	}
+
+	cmd := exec.Command(bin, "--flush-caches")
+	if err = cmd.Run(); err != nil {
+		logrus.WithError(err).Warn("unable to flush dns caches, consider adding a dns flush to your restart process")
+	} else {
+		logrus.Info("dns caches flushed")
+	}
+}
+
 func NewResolver(config string) Resolver {
+	flushDnsCaches()
 	if config == "" {
 		return nil
 	}
@@ -47,9 +65,9 @@ func NewResolver(config string) Resolver {
 
 	switch resolverURL.Scheme {
 	case "", "file":
-		return NewHostFile(resolverURL.Path)
+		return NewRefCountingResolver(NewHostFile(resolverURL.Path))
 	case "udp":
-		return NewDnsServer(resolverURL.Host)
+		return NewRefCountingResolver(NewDnsServer(resolverURL.Host))
 	}
 
 	log.Fatalf("invalid resolver configuration '%s'. must be 'file://' or 'udp://' URL", config)
@@ -118,7 +136,7 @@ func (r *resolver) testSystemResolver() error {
 		return fmt.Errorf("unexpected resolved address %s", resolved.IP.String())
 	}
 
-	_ = r.RemoveHostname(resolverTestHostname, resolverTestIP)
+	_ = r.RemoveHostname(resolverTestHostname)
 	return nil
 }
 
@@ -132,7 +150,7 @@ func (r *resolver) ServeDNS(w dns.ResponseWriter, query *dns.Msg) {
 	switch q.Qtype {
 	case dns.TypeA:
 		name := q.Name
-		address, ok := r.names[name]
+		address, ok := r.names[strings.ToLower(name)]
 		if ok {
 			msg.Authoritative = true
 			msg.Rcode = dns.RcodeSuccess
@@ -156,17 +174,17 @@ func (r *resolver) ServeDNS(w dns.ResponseWriter, query *dns.Msg) {
 func (r *resolver) AddHostname(hostname string, ip net.IP) error {
 	r.namesMtx.Lock()
 	log.Infof("adding %s = %s to resolver", hostname, ip.String())
-	r.names[hostname+"."] = ip
+	r.names[strings.ToLower(hostname)+"."] = ip
 	r.namesMtx.Unlock()
 	return nil
 }
 
-func (r *resolver) RemoveHostname(hostname string, ip net.IP) error {
+func (r *resolver) RemoveHostname(hostname string) error {
 	r.namesMtx.Lock()
-	if _, ok := r.names[hostname+"."]; ok {
+	if _, ok := r.names[strings.ToLower(hostname)+"."]; ok {
 		log.Infof("removing %s from resolver", hostname)
 	}
-	delete(r.names, hostname+".")
+	delete(r.names, strings.ToLower(hostname)+".")
 	r.namesMtx.Unlock()
 	return nil
 }

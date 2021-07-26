@@ -204,9 +204,7 @@ func (self *ServiceListener) removeService(svc *entities.Service) {
 			}
 		}
 
-		if previousService.StopHostHook != nil {
-			previousService.StopHostHook()
-		}
+		previousService.RunCleanupActions()
 
 		delete(self.services, svc.Id)
 	}
@@ -231,7 +229,7 @@ func (self *ServiceListener) host(svc *entities.Service, tracker AddressTracker)
 		}
 		self.healthCheckMgr.UnregisterServiceChecks(svc.Id)
 	}
-	svc.StopHostHook = stopHook
+	svc.AddCleanupAction(stopHook)
 
 	for idx, hostContext := range hostContexts {
 		hostControl, err := self.provider.HostService(hostContext)
@@ -346,11 +344,13 @@ type AddressTracker interface {
 type addrTracker map[string]int
 
 func (self addrTracker) AddAddress(addr string) {
+	logrus.Debugf("adding %v from address tracker: %+v", addr, self)
 	useCnt := self[addr]
 	self[addr] = useCnt + 1
 }
 
 func (self addrTracker) RemoveAddress(addr string) bool {
+	logrus.Debugf("trying to remove %v from address tracker: %+v", addr, self)
 	useCnt := self[addr]
 	if useCnt <= 1 {
 		delete(self, addr)

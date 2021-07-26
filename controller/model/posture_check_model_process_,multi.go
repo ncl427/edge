@@ -32,6 +32,14 @@ type PostureCheckProcessMulti struct {
 	Processes      []*ProcessMulti
 }
 
+func (p *PostureCheckProcessMulti) GetTimeoutSeconds() int64 {
+	return PostureCheckNoTimeout
+}
+
+func (p *PostureCheckProcessMulti) GetTimeoutRemainingSeconds(_ string, _ *PostureData) int64 {
+	return PostureCheckNoTimeout
+}
+
 type ProcessMulti struct {
 	OsType             string
 	Path               string

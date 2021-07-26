@@ -46,9 +46,9 @@ import (
 type PostureCheckMacAddressPatch struct {
 	nameField string
 
-	roleAttributesField Attributes
+	roleAttributesField *Attributes
 
-	tagsField Tags
+	tagsField *Tags
 
 	// mac addresses
 	// Min Items: 1
@@ -66,23 +66,32 @@ func (m *PostureCheckMacAddressPatch) SetName(val string) {
 }
 
 // RoleAttributes gets the role attributes of this subtype
-func (m *PostureCheckMacAddressPatch) RoleAttributes() Attributes {
+func (m *PostureCheckMacAddressPatch) RoleAttributes() *Attributes {
 	return m.roleAttributesField
 }
 
 // SetRoleAttributes sets the role attributes of this subtype
-func (m *PostureCheckMacAddressPatch) SetRoleAttributes(val Attributes) {
+func (m *PostureCheckMacAddressPatch) SetRoleAttributes(val *Attributes) {
 	m.roleAttributesField = val
 }
 
 // Tags gets the tags of this subtype
-func (m *PostureCheckMacAddressPatch) Tags() Tags {
+func (m *PostureCheckMacAddressPatch) Tags() *Tags {
 	return m.tagsField
 }
 
 // SetTags sets the tags of this subtype
-func (m *PostureCheckMacAddressPatch) SetTags(val Tags) {
+func (m *PostureCheckMacAddressPatch) SetTags(val *Tags) {
 	m.tagsField = val
+}
+
+// TypeID gets the type Id of this subtype
+func (m *PostureCheckMacAddressPatch) TypeID() PostureCheckType {
+	return "MAC"
+}
+
+// SetTypeID sets the type Id of this subtype
+func (m *PostureCheckMacAddressPatch) SetTypeID(val PostureCheckType) {
 }
 
 // UnmarshalJSON unmarshals this object with a polymorphic type from a JSON structure
@@ -106,9 +115,11 @@ func (m *PostureCheckMacAddressPatch) UnmarshalJSON(raw []byte) error {
 
 		Name string `json:"name,omitempty"`
 
-		RoleAttributes Attributes `json:"roleAttributes"`
+		RoleAttributes *Attributes `json:"roleAttributes,omitempty"`
 
-		Tags Tags `json:"tags"`
+		Tags *Tags `json:"tags,omitempty"`
+
+		TypeID PostureCheckType `json:"typeId"`
 	}
 	buf = bytes.NewBuffer(raw)
 	dec = json.NewDecoder(buf)
@@ -125,6 +136,11 @@ func (m *PostureCheckMacAddressPatch) UnmarshalJSON(raw []byte) error {
 	result.roleAttributesField = base.RoleAttributes
 
 	result.tagsField = base.Tags
+
+	if base.TypeID != result.TypeID() {
+		/* Not the type we're looking for. */
+		return errors.New(422, "invalid typeId value: %q", base.TypeID)
+	}
 
 	result.MacAddresses = data.MacAddresses
 
@@ -152,9 +168,11 @@ func (m PostureCheckMacAddressPatch) MarshalJSON() ([]byte, error) {
 	b2, err = json.Marshal(struct {
 		Name string `json:"name,omitempty"`
 
-		RoleAttributes Attributes `json:"roleAttributes"`
+		RoleAttributes *Attributes `json:"roleAttributes,omitempty"`
 
-		Tags Tags `json:"tags"`
+		Tags *Tags `json:"tags,omitempty"`
+
+		TypeID PostureCheckType `json:"typeId"`
 	}{
 
 		Name: m.Name(),
@@ -162,6 +180,8 @@ func (m PostureCheckMacAddressPatch) MarshalJSON() ([]byte, error) {
 		RoleAttributes: m.RoleAttributes(),
 
 		Tags: m.Tags(),
+
+		TypeID: m.TypeID(),
 	})
 	if err != nil {
 		return nil, err
@@ -198,11 +218,13 @@ func (m *PostureCheckMacAddressPatch) validateRoleAttributes(formats strfmt.Regi
 		return nil
 	}
 
-	if err := m.RoleAttributes().Validate(formats); err != nil {
-		if ve, ok := err.(*errors.Validation); ok {
-			return ve.ValidateName("roleAttributes")
+	if m.RoleAttributes() != nil {
+		if err := m.RoleAttributes().Validate(formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("roleAttributes")
+			}
+			return err
 		}
-		return err
 	}
 
 	return nil
@@ -261,11 +283,13 @@ func (m *PostureCheckMacAddressPatch) ContextValidate(ctx context.Context, forma
 
 func (m *PostureCheckMacAddressPatch) contextValidateRoleAttributes(ctx context.Context, formats strfmt.Registry) error {
 
-	if err := m.RoleAttributes().ContextValidate(ctx, formats); err != nil {
-		if ve, ok := err.(*errors.Validation); ok {
-			return ve.ValidateName("roleAttributes")
+	if m.RoleAttributes() != nil {
+		if err := m.RoleAttributes().ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("roleAttributes")
+			}
+			return err
 		}
-		return err
 	}
 
 	return nil
@@ -273,9 +297,23 @@ func (m *PostureCheckMacAddressPatch) contextValidateRoleAttributes(ctx context.
 
 func (m *PostureCheckMacAddressPatch) contextValidateTags(ctx context.Context, formats strfmt.Registry) error {
 
-	if err := m.Tags().ContextValidate(ctx, formats); err != nil {
+	if m.Tags() != nil {
+		if err := m.Tags().ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("tags")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *PostureCheckMacAddressPatch) contextValidateTypeID(ctx context.Context, formats strfmt.Registry) error {
+
+	if err := m.TypeID().ContextValidate(ctx, formats); err != nil {
 		if ve, ok := err.(*errors.Validation); ok {
-			return ve.ValidateName("tags")
+			return ve.ValidateName("typeId")
 		}
 		return err
 	}

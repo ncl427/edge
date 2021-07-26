@@ -80,9 +80,7 @@ const (
 )
 
 func init() {
-	pfxlog.Global(logrus.DebugLevel)
-	pfxlog.SetPrefix("github.com/openziti/")
-	logrus.SetFormatter(pfxlog.NewFormatterStartingToday())
+	pfxlog.GlobalInit(logrus.DebugLevel, pfxlog.DefaultOptions().SetTrimPrefix("github.com/openziti/").StartingToday())
 
 	_ = os.Setenv("ZITI_TRACE_ENABLED", "false")
 
@@ -408,7 +406,7 @@ func (ctx *TestContext) startEdgeRouter() {
 	ctx.router = router.Create(config, NewVersionProviderTest())
 
 	stateManager := fabric.NewStateManager()
-	xgressEdgeFactory := xgress_edge.NewFactory(config, NewVersionProviderTest(), stateManager)
+	xgressEdgeFactory := xgress_edge.NewFactory(config, NewVersionProviderTest(), stateManager, ctx.router.MetricsRegistry())
 	xgress.GlobalRegistry().Register(edge_common.EdgeBinding, xgressEdgeFactory)
 
 	xgressEdgeTunnelFactory := xgress_edge_tunnel.NewFactory(config, stateManager)
@@ -633,7 +631,9 @@ func (ctx *TestContext) newPostureCheckProcessMulti(semantic rest_model.Semantic
 		Semantic:  &semantic,
 	}
 
-	check.SetRoleAttributes(roleAttributes)
+	attributes := rest_model.Attributes(roleAttributes)
+
+	check.SetRoleAttributes(&attributes)
 
 	name := uuid.New().String()
 	check.SetName(&name)

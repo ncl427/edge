@@ -55,12 +55,17 @@ type PostureCheckPatch interface {
 	SetName(string)
 
 	// role attributes
-	RoleAttributes() Attributes
-	SetRoleAttributes(Attributes)
+	RoleAttributes() *Attributes
+	SetRoleAttributes(*Attributes)
 
 	// tags
-	Tags() Tags
-	SetTags(Tags)
+	Tags() *Tags
+	SetTags(*Tags)
+
+	// type Id
+	// Required: true
+	TypeID() PostureCheckType
+	SetTypeID(PostureCheckType)
 
 	// AdditionalProperties in base type shoud be handled just like regular properties
 	// At this moment, the base type property is pushed down to the subtype
@@ -69,9 +74,11 @@ type PostureCheckPatch interface {
 type postureCheckPatch struct {
 	nameField string
 
-	roleAttributesField Attributes
+	roleAttributesField *Attributes
 
-	tagsField Tags
+	tagsField *Tags
+
+	typeIdField PostureCheckType
 }
 
 // Name gets the name of this polymorphic type
@@ -85,23 +92,32 @@ func (m *postureCheckPatch) SetName(val string) {
 }
 
 // RoleAttributes gets the role attributes of this polymorphic type
-func (m *postureCheckPatch) RoleAttributes() Attributes {
+func (m *postureCheckPatch) RoleAttributes() *Attributes {
 	return m.roleAttributesField
 }
 
 // SetRoleAttributes sets the role attributes of this polymorphic type
-func (m *postureCheckPatch) SetRoleAttributes(val Attributes) {
+func (m *postureCheckPatch) SetRoleAttributes(val *Attributes) {
 	m.roleAttributesField = val
 }
 
 // Tags gets the tags of this polymorphic type
-func (m *postureCheckPatch) Tags() Tags {
+func (m *postureCheckPatch) Tags() *Tags {
 	return m.tagsField
 }
 
 // SetTags sets the tags of this polymorphic type
-func (m *postureCheckPatch) SetTags(val Tags) {
+func (m *postureCheckPatch) SetTags(val *Tags) {
 	m.tagsField = val
+}
+
+// TypeID gets the type Id of this polymorphic type
+func (m *postureCheckPatch) TypeID() PostureCheckType {
+	return "postureCheckPatch"
+}
+
+// SetTypeID sets the type Id of this polymorphic type
+func (m *postureCheckPatch) SetTypeID(val PostureCheckType) {
 }
 
 // UnmarshalPostureCheckPatchSlice unmarshals polymorphic slices of PostureCheckPatch
@@ -219,11 +235,13 @@ func (m *postureCheckPatch) validateRoleAttributes(formats strfmt.Registry) erro
 		return nil
 	}
 
-	if err := m.RoleAttributes().Validate(formats); err != nil {
-		if ve, ok := err.(*errors.Validation); ok {
-			return ve.ValidateName("roleAttributes")
+	if m.RoleAttributes() != nil {
+		if err := m.RoleAttributes().Validate(formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("roleAttributes")
+			}
+			return err
 		}
-		return err
 	}
 
 	return nil
@@ -258,6 +276,10 @@ func (m *postureCheckPatch) ContextValidate(ctx context.Context, formats strfmt.
 		res = append(res, err)
 	}
 
+	if err := m.contextValidateTypeID(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
@@ -266,11 +288,13 @@ func (m *postureCheckPatch) ContextValidate(ctx context.Context, formats strfmt.
 
 func (m *postureCheckPatch) contextValidateRoleAttributes(ctx context.Context, formats strfmt.Registry) error {
 
-	if err := m.RoleAttributes().ContextValidate(ctx, formats); err != nil {
-		if ve, ok := err.(*errors.Validation); ok {
-			return ve.ValidateName("roleAttributes")
+	if m.RoleAttributes() != nil {
+		if err := m.RoleAttributes().ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("roleAttributes")
+			}
+			return err
 		}
-		return err
 	}
 
 	return nil
@@ -278,9 +302,23 @@ func (m *postureCheckPatch) contextValidateRoleAttributes(ctx context.Context, f
 
 func (m *postureCheckPatch) contextValidateTags(ctx context.Context, formats strfmt.Registry) error {
 
-	if err := m.Tags().ContextValidate(ctx, formats); err != nil {
+	if m.Tags() != nil {
+		if err := m.Tags().ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("tags")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *postureCheckPatch) contextValidateTypeID(ctx context.Context, formats strfmt.Registry) error {
+
+	if err := m.TypeID().ContextValidate(ctx, formats); err != nil {
 		if ve, ok := err.(*errors.Validation); ok {
-			return ve.ValidateName("tags")
+			return ve.ValidateName("typeId")
 		}
 		return err
 	}

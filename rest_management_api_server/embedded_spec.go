@@ -465,6 +465,23 @@ func init() {
         ],
         "summary": "List authenticators",
         "operationId": "listAuthenticators",
+        "parameters": [
+          {
+            "type": "integer",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "filter",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "A list of authenticators",
@@ -12042,7 +12059,7 @@ func init() {
           "200": {
             "description": "A list of sessions",
             "schema": {
-              "$ref": "#/definitions/listSessionsEnvelope"
+              "$ref": "#/definitions/listSessionsManagementEnvelope"
             }
           },
           "401": {
@@ -12089,7 +12106,7 @@ func init() {
           "200": {
             "description": "A single session",
             "schema": {
-              "$ref": "#/definitions/detailSessionEnvelope"
+              "$ref": "#/definitions/detailSessionManagementEnvelope"
             }
           },
           "401": {
@@ -13806,8 +13823,14 @@ func init() {
         "mfa"
       ],
       "properties": {
+        "endpointState": {
+          "$ref": "#/definitions/postureDataEndpointState"
+        },
         "mfa": {
           "$ref": "#/definitions/postureDataMfa"
+        },
+        "sdkInfo": {
+          "$ref": "#/definitions/sdkInfo"
         }
       }
     },
@@ -13837,7 +13860,8 @@ func init() {
       "items": {
         "type": "string"
       },
-      "x-omitempty": false
+      "x-nullable": true,
+      "x-omitempty": true
     },
     "authQueryDetail": {
       "type": "object",
@@ -14051,8 +14075,7 @@ func init() {
         "id",
         "createdAt",
         "updatedAt",
-        "_links",
-        "tags"
+        "_links"
       ],
       "properties": {
         "_links": {
@@ -14971,7 +14994,7 @@ func init() {
         }
       }
     },
-    "detailSessionEnvelope": {
+    "detailSessionManagementEnvelope": {
       "type": "object",
       "required": [
         "meta",
@@ -14979,7 +15002,7 @@ func init() {
       ],
       "properties": {
         "data": {
-          "$ref": "#/definitions/sessionDetail"
+          "$ref": "#/definitions/sessionManagementDetail"
         },
         "meta": {
           "$ref": "#/definitions/meta"
@@ -16192,7 +16215,7 @@ func init() {
         }
       }
     },
-    "listSessionsEnvelope": {
+    "listSessionsManagementEnvelope": {
       "type": "object",
       "required": [
         "meta",
@@ -16200,7 +16223,7 @@ func init() {
       ],
       "properties": {
         "data": {
-          "$ref": "#/definitions/sessionList"
+          "$ref": "#/definitions/sessionManagementList"
         },
         "meta": {
           "$ref": "#/definitions/meta"
@@ -16698,10 +16721,10 @@ func init() {
           ],
           "properties": {
             "actualValue": {
-              "type": "boolean"
+              "$ref": "#/definitions/postureChecksFailureMfaValues"
             },
             "expectedValue": {
-              "type": "boolean"
+              "$ref": "#/definitions/postureChecksFailureMfaValues"
             }
           }
         }
@@ -16927,6 +16950,9 @@ func init() {
       "allOf": [
         {
           "$ref": "#/definitions/postureCheckCreate"
+        },
+        {
+          "$ref": "#/definitions/postureCheckMfaProperties"
         }
       ],
       "x-class": "MFA"
@@ -16935,6 +16961,9 @@ func init() {
       "allOf": [
         {
           "$ref": "#/definitions/postureCheckDetail"
+        },
+        {
+          "$ref": "#/definitions/postureCheckMfaProperties"
         }
       ],
       "x-class": "MFA"
@@ -16943,14 +16972,58 @@ func init() {
       "allOf": [
         {
           "$ref": "#/definitions/postureCheckPatch"
+        },
+        {
+          "$ref": "#/definitions/postureCheckMfaPropertiesPatch"
         }
       ],
       "x-class": "MFA"
+    },
+    "postureCheckMfaProperties": {
+      "type": "object",
+      "properties": {
+        "ignoreLegacyEndpoints": {
+          "type": "boolean"
+        },
+        "promptOnUnlock": {
+          "type": "boolean"
+        },
+        "promptOnWake": {
+          "type": "boolean"
+        },
+        "timeoutSeconds": {
+          "type": "integer"
+        }
+      }
+    },
+    "postureCheckMfaPropertiesPatch": {
+      "type": "object",
+      "properties": {
+        "ignoreLegacyEndpoints": {
+          "type": "boolean",
+          "x-nullable": true
+        },
+        "promptOnUnlock": {
+          "type": "boolean",
+          "x-nullable": true
+        },
+        "promptOnWake": {
+          "type": "boolean",
+          "x-nullable": true
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "x-nullable": true
+        }
+      }
     },
     "postureCheckMfaUpdate": {
       "allOf": [
         {
           "$ref": "#/definitions/postureCheckUpdate"
+        },
+        {
+          "$ref": "#/definitions/postureCheckMfaProperties"
         }
       ],
       "x-class": "MFA"
@@ -17045,6 +17118,9 @@ func init() {
     },
     "postureCheckPatch": {
       "type": "object",
+      "required": [
+        "typeId"
+      ],
       "properties": {
         "name": {
           "type": "string"
@@ -17054,6 +17130,9 @@ func init() {
         },
         "tags": {
           "$ref": "#/definitions/tags"
+        },
+        "typeId": {
+          "$ref": "#/definitions/postureCheckType"
         }
       },
       "discriminator": "typeId"
@@ -17302,6 +17381,23 @@ func init() {
       },
       "discriminator": "typeId"
     },
+    "postureChecksFailureMfaValues": {
+      "type": "object",
+      "properties": {
+        "passedMfa": {
+          "type": "boolean"
+        },
+        "passedOnUnlock": {
+          "type": "boolean"
+        },
+        "passedOnWake": {
+          "type": "boolean"
+        },
+        "timedOut": {
+          "type": "boolean"
+        }
+      }
+    },
     "postureData": {
       "type": "object",
       "required": [
@@ -17374,6 +17470,23 @@ func init() {
         }
       ]
     },
+    "postureDataEndpointState": {
+      "type": "object",
+      "required": [
+        "wokenAt",
+        "unlockedAt"
+      ],
+      "properties": {
+        "unlockedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "wokenAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
     "postureDataEnvelope": {
       "type": "object",
       "required": [
@@ -17415,13 +17528,21 @@ func init() {
       "type": "object",
       "required": [
         "apiSessionId",
-        "passedMfa"
+        "passedMfa",
+        "passedOnWake",
+        "passedOnUnlock"
       ],
       "properties": {
         "apiSessionId": {
           "type": "string"
         },
         "passedMfa": {
+          "type": "boolean"
+        },
+        "passedOnUnlock": {
+          "type": "boolean"
+        },
+        "passedOnWake": {
           "type": "boolean"
         }
       }
@@ -17514,7 +17635,8 @@ func init() {
           "required": [
             "queryType",
             "isPassing",
-            "timeout"
+            "timeout",
+            "timeoutRemaining"
           ],
           "properties": {
             "isPassing": {
@@ -17533,6 +17655,9 @@ func init() {
               "$ref": "#/definitions/postureCheckType"
             },
             "timeout": {
+              "type": "integer"
+            },
+            "timeoutRemaining": {
               "type": "integer"
             }
           }
@@ -18312,10 +18437,28 @@ func init() {
         }
       ]
     },
-    "sessionList": {
+    "sessionManagementDetail": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/sessionDetail"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "servicePolicies": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/entityRef"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "sessionManagementList": {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/sessionDetail"
+        "$ref": "#/definitions/sessionManagementDetail"
       }
     },
     "sessionRoutePathDetail": {
@@ -18357,13 +18500,20 @@ func init() {
         "$ref": "#/definitions/specDetail"
       }
     },
-    "tags": {
-      "description": "A map of user defined fields and values. The values are limited to the following types/values: null, string, boolean",
+    "subTags": {
       "type": "object",
       "additionalProperties": {
         "type": "object"
-      },
-      "x-omitempty": false
+      }
+    },
+    "tags": {
+      "description": "A map of user defined fields and values. The values are limited to the following types/values: null, string, boolean",
+      "allOf": [
+        {
+          "$ref": "#/definitions/subTags"
+        }
+      ],
+      "x-nullable": true
     },
     "terminatorCost": {
       "type": "integer",
@@ -19049,6 +19199,23 @@ func init() {
         ],
         "summary": "List authenticators",
         "operationId": "listAuthenticators",
+        "parameters": [
+          {
+            "type": "integer",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "filter",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "A list of authenticators",
@@ -30626,7 +30793,7 @@ func init() {
           "200": {
             "description": "A list of sessions",
             "schema": {
-              "$ref": "#/definitions/listSessionsEnvelope"
+              "$ref": "#/definitions/listSessionsManagementEnvelope"
             }
           },
           "401": {
@@ -30673,7 +30840,7 @@ func init() {
           "200": {
             "description": "A single session",
             "schema": {
-              "$ref": "#/definitions/detailSessionEnvelope"
+              "$ref": "#/definitions/detailSessionManagementEnvelope"
             }
           },
           "401": {
@@ -32480,8 +32647,14 @@ func init() {
         "mfa"
       ],
       "properties": {
+        "endpointState": {
+          "$ref": "#/definitions/postureDataEndpointState"
+        },
         "mfa": {
           "$ref": "#/definitions/postureDataMfa"
+        },
+        "sdkInfo": {
+          "$ref": "#/definitions/sdkInfo"
         }
       }
     },
@@ -32511,7 +32684,8 @@ func init() {
       "items": {
         "type": "string"
       },
-      "x-omitempty": false
+      "x-nullable": true,
+      "x-omitempty": true
     },
     "authQueryDetail": {
       "type": "object",
@@ -32725,8 +32899,7 @@ func init() {
         "id",
         "createdAt",
         "updatedAt",
-        "_links",
-        "tags"
+        "_links"
       ],
       "properties": {
         "_links": {
@@ -33645,7 +33818,7 @@ func init() {
         }
       }
     },
-    "detailSessionEnvelope": {
+    "detailSessionManagementEnvelope": {
       "type": "object",
       "required": [
         "meta",
@@ -33653,7 +33826,7 @@ func init() {
       ],
       "properties": {
         "data": {
-          "$ref": "#/definitions/sessionDetail"
+          "$ref": "#/definitions/sessionManagementDetail"
         },
         "meta": {
           "$ref": "#/definitions/meta"
@@ -34866,7 +35039,7 @@ func init() {
         }
       }
     },
-    "listSessionsEnvelope": {
+    "listSessionsManagementEnvelope": {
       "type": "object",
       "required": [
         "meta",
@@ -34874,7 +35047,7 @@ func init() {
       ],
       "properties": {
         "data": {
-          "$ref": "#/definitions/sessionList"
+          "$ref": "#/definitions/sessionManagementList"
         },
         "meta": {
           "$ref": "#/definitions/meta"
@@ -35372,10 +35545,10 @@ func init() {
           ],
           "properties": {
             "actualValue": {
-              "type": "boolean"
+              "$ref": "#/definitions/postureChecksFailureMfaValues"
             },
             "expectedValue": {
-              "type": "boolean"
+              "$ref": "#/definitions/postureChecksFailureMfaValues"
             }
           }
         }
@@ -35601,6 +35774,9 @@ func init() {
       "allOf": [
         {
           "$ref": "#/definitions/postureCheckCreate"
+        },
+        {
+          "$ref": "#/definitions/postureCheckMfaProperties"
         }
       ],
       "x-class": "MFA"
@@ -35609,6 +35785,9 @@ func init() {
       "allOf": [
         {
           "$ref": "#/definitions/postureCheckDetail"
+        },
+        {
+          "$ref": "#/definitions/postureCheckMfaProperties"
         }
       ],
       "x-class": "MFA"
@@ -35617,14 +35796,58 @@ func init() {
       "allOf": [
         {
           "$ref": "#/definitions/postureCheckPatch"
+        },
+        {
+          "$ref": "#/definitions/postureCheckMfaPropertiesPatch"
         }
       ],
       "x-class": "MFA"
+    },
+    "postureCheckMfaProperties": {
+      "type": "object",
+      "properties": {
+        "ignoreLegacyEndpoints": {
+          "type": "boolean"
+        },
+        "promptOnUnlock": {
+          "type": "boolean"
+        },
+        "promptOnWake": {
+          "type": "boolean"
+        },
+        "timeoutSeconds": {
+          "type": "integer"
+        }
+      }
+    },
+    "postureCheckMfaPropertiesPatch": {
+      "type": "object",
+      "properties": {
+        "ignoreLegacyEndpoints": {
+          "type": "boolean",
+          "x-nullable": true
+        },
+        "promptOnUnlock": {
+          "type": "boolean",
+          "x-nullable": true
+        },
+        "promptOnWake": {
+          "type": "boolean",
+          "x-nullable": true
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "x-nullable": true
+        }
+      }
     },
     "postureCheckMfaUpdate": {
       "allOf": [
         {
           "$ref": "#/definitions/postureCheckUpdate"
+        },
+        {
+          "$ref": "#/definitions/postureCheckMfaProperties"
         }
       ],
       "x-class": "MFA"
@@ -35719,6 +35942,9 @@ func init() {
     },
     "postureCheckPatch": {
       "type": "object",
+      "required": [
+        "typeId"
+      ],
       "properties": {
         "name": {
           "type": "string"
@@ -35728,6 +35954,9 @@ func init() {
         },
         "tags": {
           "$ref": "#/definitions/tags"
+        },
+        "typeId": {
+          "$ref": "#/definitions/postureCheckType"
         }
       },
       "discriminator": "typeId"
@@ -35976,6 +36205,23 @@ func init() {
       },
       "discriminator": "typeId"
     },
+    "postureChecksFailureMfaValues": {
+      "type": "object",
+      "properties": {
+        "passedMfa": {
+          "type": "boolean"
+        },
+        "passedOnUnlock": {
+          "type": "boolean"
+        },
+        "passedOnWake": {
+          "type": "boolean"
+        },
+        "timedOut": {
+          "type": "boolean"
+        }
+      }
+    },
     "postureData": {
       "type": "object",
       "required": [
@@ -36048,6 +36294,23 @@ func init() {
         }
       ]
     },
+    "postureDataEndpointState": {
+      "type": "object",
+      "required": [
+        "wokenAt",
+        "unlockedAt"
+      ],
+      "properties": {
+        "unlockedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "wokenAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
     "postureDataEnvelope": {
       "type": "object",
       "required": [
@@ -36089,13 +36352,21 @@ func init() {
       "type": "object",
       "required": [
         "apiSessionId",
-        "passedMfa"
+        "passedMfa",
+        "passedOnWake",
+        "passedOnUnlock"
       ],
       "properties": {
         "apiSessionId": {
           "type": "string"
         },
         "passedMfa": {
+          "type": "boolean"
+        },
+        "passedOnUnlock": {
+          "type": "boolean"
+        },
+        "passedOnWake": {
           "type": "boolean"
         }
       }
@@ -36188,7 +36459,8 @@ func init() {
           "required": [
             "queryType",
             "isPassing",
-            "timeout"
+            "timeout",
+            "timeoutRemaining"
           ],
           "properties": {
             "isPassing": {
@@ -36207,6 +36479,9 @@ func init() {
               "$ref": "#/definitions/postureCheckType"
             },
             "timeout": {
+              "type": "integer"
+            },
+            "timeoutRemaining": {
               "type": "integer"
             }
           }
@@ -36986,10 +37261,28 @@ func init() {
         }
       ]
     },
-    "sessionList": {
+    "sessionManagementDetail": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/sessionDetail"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "servicePolicies": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/entityRef"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "sessionManagementList": {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/sessionDetail"
+        "$ref": "#/definitions/sessionManagementDetail"
       }
     },
     "sessionRoutePathDetail": {
@@ -37031,13 +37324,20 @@ func init() {
         "$ref": "#/definitions/specDetail"
       }
     },
-    "tags": {
-      "description": "A map of user defined fields and values. The values are limited to the following types/values: null, string, boolean",
+    "subTags": {
       "type": "object",
       "additionalProperties": {
         "type": "object"
-      },
-      "x-omitempty": false
+      }
+    },
+    "tags": {
+      "description": "A map of user defined fields and values. The values are limited to the following types/values: null, string, boolean",
+      "allOf": [
+        {
+          "$ref": "#/definitions/subTags"
+        }
+      ],
+      "x-nullable": true
     },
     "terminatorCost": {
       "type": "integer",

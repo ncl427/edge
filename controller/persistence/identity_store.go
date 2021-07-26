@@ -49,8 +49,8 @@ const (
 
 	FieldIdentityBindServices              = "bindServices"
 	FieldIdentityDialServices              = "dialServices"
-	FieldIdentityDefaultHostingPrecedence  = "hostingPrecedence"
-	FieldIdentityDefaultHostingCost        = "hostingCost"
+	FieldIdentityDefaultHostingPrecedence  = "defaultHostingPrecedence"
+	FieldIdentityDefaultHostingCost        = "defaultHostingCost"
 	FieldIdentityServiceHostingPrecedences = "serviceHostingPrecedences"
 	FieldIdentityServiceHostingCosts       = "serviceHostingCosts"
 	FieldIdentityAppData                   = "appData"
@@ -281,7 +281,7 @@ func (store *identityStoreImpl) GetRoleAttributesIndex() boltz.SetReadIndex {
 func (store *identityStoreImpl) initializeLocal() {
 	store.AddExtEntitySymbols()
 
-	store.symbolRoleAttributes = store.AddSetSymbol(FieldRoleAttributes, ast.NodeTypeString)
+	store.symbolRoleAttributes = store.AddPublicSetSymbol(FieldRoleAttributes, ast.NodeTypeString)
 	store.indexRoleAttributes = store.AddSetIndex(store.symbolRoleAttributes)
 
 	store.indexName = store.addUniqueNameField()
