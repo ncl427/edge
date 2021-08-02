@@ -80,3 +80,91 @@ func (o *ListAPISessionsOK) WriteResponse(rw http.ResponseWriter, producer runti
 		}
 	}
 }
+
+// ListAPISessionsBadRequestCode is the HTTP code returned for type ListAPISessionsBadRequest
+const ListAPISessionsBadRequestCode int = 400
+
+/*ListAPISessionsBadRequest The supplied request contains invalid fields or could not be parsed (json and non-json bodies). The error's code, message, and cause fields can be inspected for further information
+
+swagger:response listApiSessionsBadRequest
+*/
+type ListAPISessionsBadRequest struct {
+
+	/*
+	  In: Body
+	*/
+	Payload *rest_model.APIErrorEnvelope `json:"body,omitempty"`
+}
+
+// NewListAPISessionsBadRequest creates ListAPISessionsBadRequest with default headers values
+func NewListAPISessionsBadRequest() *ListAPISessionsBadRequest {
+
+	return &ListAPISessionsBadRequest{}
+}
+
+// WithPayload adds the payload to the list Api sessions bad request response
+func (o *ListAPISessionsBadRequest) WithPayload(payload *rest_model.APIErrorEnvelope) *ListAPISessionsBadRequest {
+	o.Payload = payload
+	return o
+}
+
+// SetPayload sets the payload to the list Api sessions bad request response
+func (o *ListAPISessionsBadRequest) SetPayload(payload *rest_model.APIErrorEnvelope) {
+	o.Payload = payload
+}
+
+// WriteResponse to the client
+func (o *ListAPISessionsBadRequest) WriteResponse(rw http.ResponseWriter, producer runtime.Producer) {
+
+	rw.WriteHeader(400)
+	if o.Payload != nil {
+		payload := o.Payload
+		if err := producer.Produce(rw, payload); err != nil {
+			panic(err) // let the recovery middleware deal with this
+		}
+	}
+}
+
+// ListAPISessionsUnauthorizedCode is the HTTP code returned for type ListAPISessionsUnauthorized
+const ListAPISessionsUnauthorizedCode int = 401
+
+/*ListAPISessionsUnauthorized The currently supplied session does not have the correct access rights to request this resource
+
+swagger:response listApiSessionsUnauthorized
+*/
+type ListAPISessionsUnauthorized struct {
+
+	/*
+	  In: Body
+	*/
+	Payload *rest_model.APIErrorEnvelope `json:"body,omitempty"`
+}
+
+// NewListAPISessionsUnauthorized creates ListAPISessionsUnauthorized with default headers values
+func NewListAPISessionsUnauthorized() *ListAPISessionsUnauthorized {
+
+	return &ListAPISessionsUnauthorized{}
+}
+
+// WithPayload adds the payload to the list Api sessions unauthorized response
+func (o *ListAPISessionsUnauthorized) WithPayload(payload *rest_model.APIErrorEnvelope) *ListAPISessionsUnauthorized {
+	o.Payload = payload
+	return o
+}
+
+// SetPayload sets the payload to the list Api sessions unauthorized response
+func (o *ListAPISessionsUnauthorized) SetPayload(payload *rest_model.APIErrorEnvelope) {
+	o.Payload = payload
+}
+
+// WriteResponse to the client
+func (o *ListAPISessionsUnauthorized) WriteResponse(rw http.ResponseWriter, producer runtime.Producer) {
+
+	rw.WriteHeader(401)
+	if o.Payload != nil {
+		payload := o.Payload
+		if err := producer.Produce(rw, payload); err != nil {
+			panic(err) // let the recovery middleware deal with this
+		}
+	}
+}

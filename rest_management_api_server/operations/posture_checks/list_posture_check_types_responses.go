@@ -80,3 +80,91 @@ func (o *ListPostureCheckTypesOK) WriteResponse(rw http.ResponseWriter, producer
 		}
 	}
 }
+
+// ListPostureCheckTypesBadRequestCode is the HTTP code returned for type ListPostureCheckTypesBadRequest
+const ListPostureCheckTypesBadRequestCode int = 400
+
+/*ListPostureCheckTypesBadRequest The supplied request contains invalid fields or could not be parsed (json and non-json bodies). The error's code, message, and cause fields can be inspected for further information
+
+swagger:response listPostureCheckTypesBadRequest
+*/
+type ListPostureCheckTypesBadRequest struct {
+
+	/*
+	  In: Body
+	*/
+	Payload *rest_model.APIErrorEnvelope `json:"body,omitempty"`
+}
+
+// NewListPostureCheckTypesBadRequest creates ListPostureCheckTypesBadRequest with default headers values
+func NewListPostureCheckTypesBadRequest() *ListPostureCheckTypesBadRequest {
+
+	return &ListPostureCheckTypesBadRequest{}
+}
+
+// WithPayload adds the payload to the list posture check types bad request response
+func (o *ListPostureCheckTypesBadRequest) WithPayload(payload *rest_model.APIErrorEnvelope) *ListPostureCheckTypesBadRequest {
+	o.Payload = payload
+	return o
+}
+
+// SetPayload sets the payload to the list posture check types bad request response
+func (o *ListPostureCheckTypesBadRequest) SetPayload(payload *rest_model.APIErrorEnvelope) {
+	o.Payload = payload
+}
+
+// WriteResponse to the client
+func (o *ListPostureCheckTypesBadRequest) WriteResponse(rw http.ResponseWriter, producer runtime.Producer) {
+
+	rw.WriteHeader(400)
+	if o.Payload != nil {
+		payload := o.Payload
+		if err := producer.Produce(rw, payload); err != nil {
+			panic(err) // let the recovery middleware deal with this
+		}
+	}
+}
+
+// ListPostureCheckTypesUnauthorizedCode is the HTTP code returned for type ListPostureCheckTypesUnauthorized
+const ListPostureCheckTypesUnauthorizedCode int = 401
+
+/*ListPostureCheckTypesUnauthorized The currently supplied session does not have the correct access rights to request this resource
+
+swagger:response listPostureCheckTypesUnauthorized
+*/
+type ListPostureCheckTypesUnauthorized struct {
+
+	/*
+	  In: Body
+	*/
+	Payload *rest_model.APIErrorEnvelope `json:"body,omitempty"`
+}
+
+// NewListPostureCheckTypesUnauthorized creates ListPostureCheckTypesUnauthorized with default headers values
+func NewListPostureCheckTypesUnauthorized() *ListPostureCheckTypesUnauthorized {
+
+	return &ListPostureCheckTypesUnauthorized{}
+}
+
+// WithPayload adds the payload to the list posture check types unauthorized response
+func (o *ListPostureCheckTypesUnauthorized) WithPayload(payload *rest_model.APIErrorEnvelope) *ListPostureCheckTypesUnauthorized {
+	o.Payload = payload
+	return o
+}
+
+// SetPayload sets the payload to the list posture check types unauthorized response
+func (o *ListPostureCheckTypesUnauthorized) SetPayload(payload *rest_model.APIErrorEnvelope) {
+	o.Payload = payload
+}
+
+// WriteResponse to the client
+func (o *ListPostureCheckTypesUnauthorized) WriteResponse(rw http.ResponseWriter, producer runtime.Producer) {
+
+	rw.WriteHeader(401)
+	if o.Payload != nil {
+		payload := o.Payload
+		if err := producer.Produce(rw, payload); err != nil {
+			panic(err) // let the recovery middleware deal with this
+		}
+	}
+}
