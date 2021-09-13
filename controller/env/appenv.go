@@ -86,6 +86,7 @@ type AppEnv struct {
 	InstanceId               string
 	findEnrollmentSignerOnce sync.Once
 	enrollmentSigner         jwtsigner.Signer
+	TraceManager             *TraceManager
 }
 
 func (ae *AppEnv) GetApiServerCsrSigner() cert.Signer {
@@ -250,12 +251,11 @@ func (ae *AppEnv) FillRequestContext(rc *response.RequestContext) error {
 		}
 	}
 
-	//updates for session timeouts
-	if rc.ApiSession != nil {
-		ae.GetHandlers().ApiSession.MarkActivityById(rc.ApiSession.Id)
-	}
 
 	if rc.ApiSession != nil {
+		//updates for api session timeouts
+		ae.GetHandlers().ApiSession.MarkActivityById(rc.ApiSession.Id)
+
 		var err error
 		rc.Identity, err = ae.GetHandlers().Identity.Read(rc.ApiSession.IdentityId)
 		if err != nil {
@@ -373,7 +373,7 @@ func (ae *AppEnv) InitPersistence() error {
 	}
 
 	ae.Handlers = model.InitHandlers(ae)
-	events.Init(ae.BoltStores.Session)
+	events.Init(ae.GetDbProvider(), ae.BoltStores, ae.GetHostController().GetCloseNotifyChannel())
 
 	persistence.ServiceEvents.AddServiceEventHandler(ae.HandleServiceEvent)
 	ae.BoltStores.Identity.AddListener(boltz.EventDelete, func(i ...interface{}) {

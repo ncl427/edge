@@ -3,7 +3,7 @@ swagger: '2.0'
 info:
   version: 0.19.12
   title: Ziti Edge Management
-  contact: { }
+  contact: {}
 host: demo.ziti.dev
 basePath: /edge/management/v1
 schemes:
@@ -120,6 +120,8 @@ paths:
     $ref: 'management/identities.yml#/paths/identities'
   '/identities/{id}':
     $ref: 'management/identities.yml#/paths/identities-id'
+  '/identities/{id}/authenticators':
+    $ref: "management/identities.yml#/paths/identities-id-authenticators"
   '/identities/{id}/edge-router-policies':
     $ref: 'management/identities.yml#/paths/identities-id-edge-router-policies'
   '/identities/{id}/service-configs':
@@ -138,6 +140,8 @@ paths:
     $ref: 'management/identities.yml#/paths/identities-id-failed-service-requests'
   '/identities/{id}/mfa':
     $ref: 'management/identities.yml#/paths/identities-id-mfa'
+  '/identities/{id}/trace':
+    $ref: 'management/identities.yml#/paths/identities-id-trace'
 
   '/identity-role-attributes':
     $ref: 'management/role-attributes.yml#/paths/identity-role-attributes'

@@ -126,7 +126,7 @@ func (r *SessionRouter) Create(ae *env.AppEnv, rc *response.RequestContext, para
 	start := time.Now()
 	responder := &SessionRequestResponder{ae: ae, Responder: rc}
 	CreateWithResponder(rc, responder, SessionLinkFactory, func() (string, error) {
-		return ae.Handlers.Session.Create(MapCreateSessionToModel(rc.ApiSession.Id, params.Session))
+		return ae.Handlers.Session.Create(MapCreateSessionToModel(rc.Identity.Id, rc.ApiSession.Id, params.Session))
 	})
 	r.createTimer.UpdateSince(start)
 }
@@ -134,10 +134,10 @@ func (r *SessionRouter) Create(ae *env.AppEnv, rc *response.RequestContext, para
 func (r *SessionRouter) DetailRoutePath(ae *env.AppEnv, rc *response.RequestContext, params managementSession.DetailSessionRoutePathParams) {
 	path := []string{} //must be non null
 
-	for _, fabricSession := range ae.HostController.GetNetwork().GetAllSessions() {
-		if fabricSession.ClientId != nil && fabricSession.ClientId.Token == params.ID {
-			if fabricSession.Circuit != nil {
-				for _, pathSeg := range fabricSession.Circuit.Path {
+	for _, circuit := range ae.HostController.GetNetwork().GetAllCircuits() {
+		if circuit.ClientId == params.ID {
+			if circuit.Path != nil {
+				for _, pathSeg := range circuit.Path.Nodes {
 					path = append(path, pathSeg.Id)
 				}
 				break

@@ -18,13 +18,14 @@ package xgress_edge_transport
 
 import (
 	"fmt"
+	"github.com/michaelquigley/pfxlog"
 	"github.com/openziti/edge/router/xgress_common"
 	"github.com/openziti/fabric/controller/xt"
+	"github.com/openziti/fabric/logcontext"
 	"github.com/openziti/fabric/router/xgress"
 	"github.com/openziti/foundation/identity/identity"
 	"github.com/openziti/foundation/transport"
 	"github.com/openziti/sdk-golang/ziti/edge"
-	"github.com/sirupsen/logrus"
 )
 
 type dialer struct {
@@ -44,22 +45,27 @@ func newDialer(ctrl xgress.CtrlChannel, options *xgress.Options) (xgress.Dialer,
 	return txd, nil
 }
 
-func (txd *dialer) Dial(destination string, sessionId *identity.TokenId, address xgress.Address, bindHandler xgress.BindHandler) (xt.PeerData, error) {
+func (txd *dialer) Dial(destination string, circuitId *identity.TokenId, address xgress.Address, bindHandler xgress.BindHandler, ctx logcontext.Context) (xt.PeerData, error) {
+	log := pfxlog.ChannelLogger(logcontext.EstablishPath).Wire(ctx).
+		WithField("binding", "edge_transport").
+		WithField("destination", destination)
+
 	txDestination, err := transport.ParseAddress(destination)
 	if err != nil {
 		return nil, fmt.Errorf("cannot dial on invalid address [%s] (%s)", destination, err)
 	}
 
-	peer, err := txDestination.Dial("x/"+sessionId.Token, sessionId, txd.options.ConnectTimeout, nil)
+	log.Debug("dialing")
+	peer, err := txDestination.Dial("x/"+circuitId.Token, circuitId, txd.options.ConnectTimeout, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	logrus.Infof("successful connection to %v from %v (s/%v)", destination, peer.Conn().LocalAddr(), sessionId.Token)
+	log.Infof("successful connection to %v from %v (s/%v)", destination, peer.Conn().LocalAddr(), circuitId.Token)
 
 	xgConn := xgress_common.NewXgressConn(peer.Conn(), true)
 	peerData := make(xt.PeerData, 1)
-	if peerKey, ok := sessionId.Data[edge.PublicKeyHeader]; ok {
+	if peerKey, ok := circuitId.Data[edge.PublicKeyHeader]; ok {
 		if publicKey, err := xgConn.SetupServerCrypto(peerKey); err != nil {
 			return nil, err
 		} else {
@@ -67,7 +73,7 @@ func (txd *dialer) Dial(destination string, sessionId *identity.TokenId, address
 		}
 	}
 
-	x := xgress.NewXgress(sessionId, address, xgConn, xgress.Terminator, txd.options)
+	x := xgress.NewXgress(circuitId, address, xgConn, xgress.Terminator, txd.options)
 	bindHandler.HandleXgressBind(x)
 	x.Start()
 

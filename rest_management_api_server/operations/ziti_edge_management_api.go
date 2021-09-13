@@ -313,6 +313,9 @@ func NewZitiEdgeManagementAPI(spec *loads.Document) *ZitiEdgeManagementAPI {
 		CurrentIdentityGetCurrentIdentityHandler: current_identity.GetCurrentIdentityHandlerFunc(func(params current_identity.GetCurrentIdentityParams, principal interface{}) middleware.Responder {
 			return middleware.NotImplemented("operation current_identity.GetCurrentIdentity has not yet been implemented")
 		}),
+		IdentityGetIdentityAuthenticatorsHandler: identity.GetIdentityAuthenticatorsHandlerFunc(func(params identity.GetIdentityAuthenticatorsParams, principal interface{}) middleware.Responder {
+			return middleware.NotImplemented("operation identity.GetIdentityAuthenticators has not yet been implemented")
+		}),
 		IdentityGetIdentityFailedServiceRequestsHandler: identity.GetIdentityFailedServiceRequestsHandlerFunc(func(params identity.GetIdentityFailedServiceRequestsParams, principal interface{}) middleware.Responder {
 			return middleware.NotImplemented("operation identity.GetIdentityFailedServiceRequests has not yet been implemented")
 		}),
@@ -543,6 +546,9 @@ func NewZitiEdgeManagementAPI(spec *loads.Document) *ZitiEdgeManagementAPI {
 		}),
 		IdentityUpdateIdentityHandler: identity.UpdateIdentityHandlerFunc(func(params identity.UpdateIdentityParams, principal interface{}) middleware.Responder {
 			return middleware.NotImplemented("operation identity.UpdateIdentity has not yet been implemented")
+		}),
+		IdentityUpdateIdentityTracingHandler: identity.UpdateIdentityTracingHandlerFunc(func(params identity.UpdateIdentityTracingParams, principal interface{}) middleware.Responder {
+			return middleware.NotImplemented("operation identity.UpdateIdentityTracing has not yet been implemented")
 		}),
 		PostureChecksUpdatePostureCheckHandler: posture_checks.UpdatePostureCheckHandlerFunc(func(params posture_checks.UpdatePostureCheckParams, principal interface{}) middleware.Responder {
 			return middleware.NotImplemented("operation posture_checks.UpdatePostureCheck has not yet been implemented")
@@ -777,6 +783,8 @@ type ZitiEdgeManagementAPI struct {
 	CurrentAPISessionGetCurrentAPISessionHandler current_api_session.GetCurrentAPISessionHandler
 	// CurrentIdentityGetCurrentIdentityHandler sets the operation handler for the get current identity operation
 	CurrentIdentityGetCurrentIdentityHandler current_identity.GetCurrentIdentityHandler
+	// IdentityGetIdentityAuthenticatorsHandler sets the operation handler for the get identity authenticators operation
+	IdentityGetIdentityAuthenticatorsHandler identity.GetIdentityAuthenticatorsHandler
 	// IdentityGetIdentityFailedServiceRequestsHandler sets the operation handler for the get identity failed service requests operation
 	IdentityGetIdentityFailedServiceRequestsHandler identity.GetIdentityFailedServiceRequestsHandler
 	// IdentityGetIdentityPolicyAdviceHandler sets the operation handler for the get identity policy advice operation
@@ -931,6 +939,8 @@ type ZitiEdgeManagementAPI struct {
 	EdgeRouterPolicyUpdateEdgeRouterPolicyHandler edge_router_policy.UpdateEdgeRouterPolicyHandler
 	// IdentityUpdateIdentityHandler sets the operation handler for the update identity operation
 	IdentityUpdateIdentityHandler identity.UpdateIdentityHandler
+	// IdentityUpdateIdentityTracingHandler sets the operation handler for the update identity tracing operation
+	IdentityUpdateIdentityTracingHandler identity.UpdateIdentityTracingHandler
 	// PostureChecksUpdatePostureCheckHandler sets the operation handler for the update posture check operation
 	PostureChecksUpdatePostureCheckHandler posture_checks.UpdatePostureCheckHandler
 	// RouterUpdateRouterHandler sets the operation handler for the update router operation
@@ -1258,6 +1268,9 @@ func (o *ZitiEdgeManagementAPI) Validate() error {
 	if o.CurrentIdentityGetCurrentIdentityHandler == nil {
 		unregistered = append(unregistered, "current_identity.GetCurrentIdentityHandler")
 	}
+	if o.IdentityGetIdentityAuthenticatorsHandler == nil {
+		unregistered = append(unregistered, "identity.GetIdentityAuthenticatorsHandler")
+	}
 	if o.IdentityGetIdentityFailedServiceRequestsHandler == nil {
 		unregistered = append(unregistered, "identity.GetIdentityFailedServiceRequestsHandler")
 	}
@@ -1488,6 +1501,9 @@ func (o *ZitiEdgeManagementAPI) Validate() error {
 	}
 	if o.IdentityUpdateIdentityHandler == nil {
 		unregistered = append(unregistered, "identity.UpdateIdentityHandler")
+	}
+	if o.IdentityUpdateIdentityTracingHandler == nil {
+		unregistered = append(unregistered, "identity.UpdateIdentityTracingHandler")
 	}
 	if o.PostureChecksUpdatePostureCheckHandler == nil {
 		unregistered = append(unregistered, "posture_checks.UpdatePostureCheckHandler")
@@ -1912,6 +1928,10 @@ func (o *ZitiEdgeManagementAPI) initHandlerCache() {
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
+	o.handlers["GET"]["/identities/{id}/authenticators"] = identity.NewGetIdentityAuthenticators(o.context, o.IdentityGetIdentityAuthenticatorsHandler)
+	if o.handlers["GET"] == nil {
+		o.handlers["GET"] = make(map[string]http.Handler)
+	}
 	o.handlers["GET"]["/identities/{id}/failed-service-requests"] = identity.NewGetIdentityFailedServiceRequests(o.context, o.IdentityGetIdentityFailedServiceRequestsHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
@@ -2217,6 +2237,10 @@ func (o *ZitiEdgeManagementAPI) initHandlerCache() {
 		o.handlers["PUT"] = make(map[string]http.Handler)
 	}
 	o.handlers["PUT"]["/identities/{id}"] = identity.NewUpdateIdentity(o.context, o.IdentityUpdateIdentityHandler)
+	if o.handlers["PUT"] == nil {
+		o.handlers["PUT"] = make(map[string]http.Handler)
+	}
+	o.handlers["PUT"]["/identities/{id}/trace"] = identity.NewUpdateIdentityTracing(o.context, o.IdentityUpdateIdentityTracingHandler)
 	if o.handlers["PUT"] == nil {
 		o.handlers["PUT"] = make(map[string]http.Handler)
 	}

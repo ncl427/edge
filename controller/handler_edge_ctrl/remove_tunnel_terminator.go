@@ -61,11 +61,13 @@ func (self *removeTunnelTerminatorHandler) RemoveTerminator(ctx *RemoveTunnelTer
 		return
 	}
 
-	ctx.verifyTerminator(ctx.terminatorId, edge_common.TunnelBinding)
+	t := ctx.verifyTerminator(ctx.terminatorId, edge_common.TunnelBinding)
 	if ctx.err != nil {
 		self.returnError(ctx, ctx.err)
 		return
 	}
+
+	logger = logger.WithField("serviceId", t.Service)
 
 	err := self.getNetwork().Terminators.Delete(ctx.terminatorId)
 	if err != nil {
@@ -73,7 +75,7 @@ func (self *removeTunnelTerminatorHandler) RemoveTerminator(ctx *RemoveTunnelTer
 		return
 	}
 
-	logrus.Info("removed terminator")
+	logger.Info("removed terminator")
 
 	responseMsg := channel2.NewMessage(int32(edge_ctrl_pb.ContentType_RemoveTunnelTerminatorResponseType), nil)
 	responseMsg.ReplyTo(ctx.msg)

@@ -7,6 +7,7 @@ import (
 	"github.com/openziti/edge/controller/model"
 	"github.com/openziti/edge/controller/persistence"
 	"github.com/openziti/edge/pb/edge_ctrl_pb"
+	"github.com/openziti/fabric/logcontext"
 	"github.com/openziti/foundation/storage/boltz"
 	"github.com/openziti/sdk-golang/ziti"
 	"github.com/sirupsen/logrus"
@@ -67,6 +68,14 @@ func (self *baseTunnelRequestContext) loadIdentity() {
 
 		if self.identity.IdentityTypeId != persistence.RouterIdentityType {
 			self.err = TunnelingNotEnabledError{}
+			return
+		}
+
+		self.logContext = logcontext.NewContext()
+		traceSpec := self.handler.getAppEnv().TraceManager.GetIdentityTrace(self.identity.Id)
+		if traceSpec != nil && time.Now().After(traceSpec.Until) {
+			self.logContext.SetChannelsMask(traceSpec.ChannelMask)
+			self.logContext.WithField("traceId", traceSpec.TraceId)
 		}
 	}
 }
@@ -85,7 +94,7 @@ func (self *baseTunnelRequestContext) ensureApiSession(configTypes []string) boo
 				self.apiSession = apiSession
 
 				if _, err := self.handler.getAppEnv().GetHandlers().ApiSession.MarkActivityByTokens(self.apiSession.Token); err != nil {
-					logger.WithError(err).Error("unexepcted error while marking api session activity")
+					logger.WithError(err).Error("unexpected error while marking api session activity")
 				}
 				return false
 			}
@@ -94,7 +103,7 @@ func (self *baseTunnelRequestContext) ensureApiSession(configTypes []string) boo
 				self.err = internalError(err)
 				return false
 			}
-			logger.WithField("api-session-id", apiSessionId).Info("api session not found, creating new api session")
+			logger.WithField("apiSessionId", apiSessionId).Info("api session not found, creating new api session")
 			state.clearCurrentApiSessionId()
 		}
 
@@ -133,9 +142,35 @@ func (self *baseTunnelRequestContext) ensureApiSession(configTypes []string) boo
 		self.apiSession = apiSession
 		state.setCurrentApiSessionId(apiSession.Id)
 		state.configTypes = configTypes
+		if self.logContext != nil {
+			self.logContext.WithField("apiSessionId", apiSession.Id)
+		}
 		return true
 	}
 	return false
+}
+
+func (self *baseTunnelRequestContext) loadServiceForName(name string) {
+	if self.err == nil {
+		var err error
+		self.service, err = self.handler.getAppEnv().Handlers.EdgeService.ReadByName(name)
+
+		if err != nil {
+			if boltz.IsErrNotFoundErr(err) {
+				err = InvalidServiceError{}
+			} else {
+				err = internalError(err)
+			}
+
+			logrus.
+				WithField("apiSessionId", self.apiSession.Id).
+				WithField("operation", self.handler.Label()).
+				WithField("router", self.sourceRouter.Name).
+				WithField("serviceName", name).
+				WithError(self.err).
+				Error("service not found")
+		}
+	}
 }
 
 func (self *baseTunnelRequestContext) ensureSessionForService(sessionId, sessionType string) {
@@ -168,6 +203,7 @@ func (self *baseTunnelRequestContext) ensureSessionForService(sessionId, session
 			Token:        uuid.NewString(),
 			ApiSessionId: self.apiSession.Id,
 			ServiceId:    self.service.Id,
+			IdentityId: self.identity.Id,
 			Type:         sessionType,
 		}
 
@@ -180,6 +216,11 @@ func (self *baseTunnelRequestContext) ensureSessionForService(sessionId, session
 		self.session, err = self.handler.getAppEnv().Handlers.Session.Read(id)
 		if err != nil {
 			err = internalError(err)
+			return
+		}
+		self.newSession = true
+		if self.logContext != nil {
+			self.logContext.WithField("sessionId", self.session.Id)
 		}
 	}
 }

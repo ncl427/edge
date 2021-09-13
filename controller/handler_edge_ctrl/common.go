@@ -11,6 +11,7 @@ import (
 	"github.com/openziti/fabric/controller/db"
 	"github.com/openziti/fabric/controller/network"
 	"github.com/openziti/fabric/controller/xt"
+	"github.com/openziti/fabric/logcontext"
 	"github.com/openziti/foundation/channel2"
 	"github.com/openziti/foundation/identity/identity"
 	"github.com/openziti/foundation/storage/boltz"
@@ -57,6 +58,7 @@ func (self *baseRequestHandler) getChannel() channel2.Channel {
 }
 
 func (self *baseRequestHandler) returnError(ctx requestContext, err controllerError) {
+	ctx.CleanupOnError()
 	responseMsg := channel2.NewMessage(int32(edge_ctrl_pb.ContentType_ErrorType), []byte(err.Error()))
 	responseMsg.PutUint32Header(edge.ErrorCodeHeader, err.ErrorCode())
 	responseMsg.ReplyTo(ctx.GetMessage())
@@ -96,6 +98,7 @@ func (self *baseRequestHandler) logResult(ctx requestContext, err error) {
 type requestContext interface {
 	GetHandler() requestHandler
 	GetMessage() *channel2.Message
+	CleanupOnError()
 }
 
 type sessionRequestContext interface {
@@ -110,6 +113,20 @@ type baseSessionRequestContext struct {
 	sourceRouter *network.Router
 	session      *model.Session
 	service      *model.Service
+	newSession   bool
+	logContext   logcontext.Context
+}
+
+func (self *baseSessionRequestContext) CleanupOnError() {
+	if self.newSession && self.session != nil {
+		logger := logrus.
+			WithField("operation", self.handler.Label()).
+			WithField("router", self.sourceRouter.Name)
+
+		if err := self.handler.getAppEnv().Handlers.Session.Delete(self.session.Id); err != nil {
+			logger.WithError(err).Error("unable to delete session created before error encountered")
+		}
+	}
 }
 
 func (self *baseSessionRequestContext) GetMessage() *channel2.Message {
@@ -150,6 +167,36 @@ func (self *baseSessionRequestContext) loadSession(token string) {
 				WithField("token", token).
 				WithField("operation", self.handler.Label()).
 				WithError(self.err).Errorf("invalid session")
+			return
+		}
+		apiSession, err := self.handler.getAppEnv().Handlers.ApiSession.Read(self.session.ApiSessionId)
+		if err != nil {
+			if boltz.IsErrNotFoundErr(err) {
+				self.err = InvalidApiSessionError{}
+			} else {
+				self.err = internalError(err)
+			}
+			logrus.
+				WithField("token", token).
+				WithField("operation", self.handler.Label()).
+				WithError(self.err).Errorf("invalid api-session")
+			return
+		}
+
+		self.logContext = logcontext.NewContext()
+		traceSpec := self.handler.getAppEnv().TraceManager.GetIdentityTrace(apiSession.IdentityId)
+		traceEnabled := traceSpec != nil && time.Now().Before(traceSpec.Until)
+		if traceEnabled {
+			self.logContext.SetChannelsMask(traceSpec.ChannelMask)
+			self.logContext.WithField("traceId", traceSpec.TraceId)
+		}
+		self.logContext.WithField("sessionId", self.session.Id)
+		self.logContext.WithField("apiSessionId", apiSession.Id)
+
+		if traceEnabled {
+			pfxlog.ChannelLogger(logcontext.EstablishPath).
+				Wire(self.logContext).
+				Debug("tracing enabled for this session")
 		}
 	}
 }
@@ -242,28 +289,6 @@ func (self *baseSessionRequestContext) loadService() {
 			} else {
 				err = internalError(err)
 			}
-			logrus.
-				WithField("sessionId", self.session.Id).
-				WithField("operation", self.handler.Label()).
-				WithField("serviceId", self.session.ServiceId).
-				WithError(self.err).
-				Error("service not found")
-		}
-	}
-}
-
-func (self *baseSessionRequestContext) loadServiceForName(name string) {
-	if self.err == nil {
-		var err error
-		self.service, err = self.handler.getAppEnv().Handlers.EdgeService.ReadByName(name)
-
-		if err != nil {
-			if boltz.IsErrNotFoundErr(err) {
-				err = InvalidServiceError{}
-			} else {
-				err = internalError(err)
-			}
-
 			logrus.
 				WithField("sessionId", self.session.Id).
 				WithField("operation", self.handler.Label()).
@@ -435,8 +460,8 @@ func (self *baseSessionRequestContext) updateTerminator(terminator *network.Term
 	}
 }
 
-func (self *baseSessionRequestContext) createCircuit(terminatorIdentity string, peerData map[uint32][]byte) (*network.Session, map[uint32][]byte) {
-	var circuit *network.Session
+func (self *baseSessionRequestContext) createCircuit(terminatorIdentity string, peerData map[uint32][]byte) (*network.Circuit, map[uint32][]byte) {
+	var circuit *network.Circuit
 	returnPeerData := map[uint32][]byte{}
 
 	if self.err == nil {
@@ -454,7 +479,7 @@ func (self *baseSessionRequestContext) createCircuit(terminatorIdentity string, 
 
 		n := self.handler.getAppEnv().GetHostController().GetNetwork()
 		var err error
-		circuit, err = n.CreateSession(self.sourceRouter, clientId, serviceId)
+		circuit, err = n.CreateCircuit(self.sourceRouter, clientId, serviceId, self.logContext)
 		if err != nil {
 			self.err = internalError(err)
 		}
@@ -472,7 +497,7 @@ func (self *baseSessionRequestContext) createCircuit(terminatorIdentity string, 
 
 			if self.service.EncryptionRequired && returnPeerData[edge.PublicKeyHeader] == nil {
 				self.err = encryptionDataMissing("encryption required on service, terminator did not send public header")
-				if err := n.RemoveSession(circuit.Id, true); err != nil {
+				if err := n.RemoveCircuit(circuit.Id, true); err != nil {
 					logrus.
 						WithField("operation", self.handler.Label()).
 						WithField("sourceRouter", self.sourceRouter.Id).

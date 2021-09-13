@@ -63,11 +63,11 @@ func (self *eventsCollector) AcceptUsageEvent(event *events.UsageEvent) {
 	}
 }
 
-func (self *eventsCollector) AcceptEdgeSessionEvent(event *events2.EdgeSessionEvent) {
+func (self *eventsCollector) AcceptSessionEvent(event *events2.SessionEvent) {
 	self.acceptEvent(event)
 }
 
-func (self *eventsCollector) AcceptSessionEvent(event *events.SessionEvent) {
+func (self *eventsCollector) AcceptCircuitEvent(event *events.CircuitEvent) {
 	self.acceptEvent(event)
 }
 
@@ -86,7 +86,7 @@ func Test_EventsTest(t *testing.T) {
 		usageEventNotify: make(chan struct{}),
 	}
 
-	unregisterFabricSessionEventsHandler := events.RegisterSessionEventHandler(ec)
+	unregisterFabricSessionEventsHandler := events.RegisterCircuitEventHandler(ec)
 	defer unregisterFabricSessionEventsHandler()
 
 	events2.AddSessionEventHandler(ec)
@@ -139,38 +139,39 @@ func Test_EventsTest(t *testing.T) {
 	}
 
 	event := ec.PopNextEvent(ctx)
-	edgeSession, ok := event.(*events2.EdgeSessionEvent)
+	edgeSession, ok := event.(*events2.SessionEvent)
 	ctx.Req.True(ok)
 	ctx.Req.Equal("edge.sessions", edgeSession.Namespace)
 	ctx.Req.Equal("created", edgeSession.EventType)
 	ctx.Req.Equal(hostIdentity.Id, edgeSession.IdentityId)
 
 	event = ec.PopNextEvent(ctx)
-	edgeSession, ok = event.(*events2.EdgeSessionEvent)
+	edgeSession, ok = event.(*events2.SessionEvent)
 	ctx.Req.True(ok)
 	ctx.Req.Equal("edge.sessions", edgeSession.Namespace)
 	ctx.Req.Equal("created", edgeSession.EventType)
 	ctx.Req.Equal(clientIdentity.Id, edgeSession.IdentityId)
 
 	event = ec.PopNextEvent(ctx)
-	fabricSession, ok := event.(*events.SessionEvent)
+	circuitEvent, ok := event.(*events.CircuitEvent)
 	ctx.Req.True(ok)
-	ctx.Req.Equal("fabric.sessions", fabricSession.Namespace)
-	ctx.Req.Equal("created", fabricSession.EventType)
-	ctx.Req.Equal(service.Id, fabricSession.ServiceId)
-	ctx.Req.Equal(edgeSession.Id, fabricSession.ClientId)
+	ctx.Req.Equal("fabric.circuits", circuitEvent.Namespace)
+	ctx.Req.Equal("created", circuitEvent.EventType)
+	ctx.Req.Equal(service.Id, circuitEvent.ServiceId)
+	ctx.Req.Equal(edgeSession.Id, circuitEvent.ClientId)
 
 	for i := 0; i < 3; i++ {
 		event = ec.PopNextEvent(ctx)
 		if usage, ok := event.(*events.UsageEvent); ok {
 			ctx.Req.Equal("fabric.usage", usage.Namespace)
-			ctx.Req.Equal(fabricSession.SessionId, usage.SessionId)
+			ctx.Req.Equal(uint32(2), usage.Version)
+			ctx.Req.Equal(circuitEvent.CircuitId, usage.CircuitId)
 			expected := []string{"usage.ingress.rx", "usage.egress.tx"}
 			ctx.Req.True(stringz.Contains(expected, usage.EventType), "was %v, expected one of %+v", usage.EventType, expected)
 			ctx.Req.Equal(ctx.edgeRouterEntity.id, usage.SourceId)
 			ctx.Req.Equal(uint64(26), usage.Usage)
-		} else if fabricSession, ok := event.(*events.SessionEvent); ok {
-			ctx.Req.Equal("fabric.sessions", fabricSession.Namespace)
+		} else if fabricSession, ok := event.(*events.CircuitEvent); ok {
+			ctx.Req.Equal("fabric.circuits", fabricSession.Namespace)
 			ctx.Req.Equal("deleted", fabricSession.EventType)
 			ctx.Req.Equal(edgeSession.Id, fabricSession.ClientId)
 		} else {

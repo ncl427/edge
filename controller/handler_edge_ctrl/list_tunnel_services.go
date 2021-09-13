@@ -51,10 +51,8 @@ func (self *listTunnelServicesHandler) HandleReceive(msg *channel2.Message, _ ch
 			return
 		}
 
-		if t, err := time.Parse(time.RFC3339Nano, string(msg.Body)); err != nil {
-			logger.WithError(err).Errorf("failed to parse last update time: %v", t)
-		} else {
-			ctx.lastUpdate = t
+		if err := ctx.lastUpdate.UnmarshalBinary(msg.Body); err != nil {
+			logger.WithError(err).Errorf("failed to parse last update time: %v", string(msg.Body))
 		}
 	}
 
@@ -79,11 +77,11 @@ func (self *listTunnelServicesHandler) listServices(ctx *listTunnelServicesReque
 	var lastUpdate time.Time
 	if val, found := self.appEnv.IdentityRefreshMap.Get(ctx.identity.Id); found {
 		lastUpdate = val.(time.Time)
-	} else if lastUpdate.Before(self.appEnv.StartupTime) {
+	} else {
 		lastUpdate = self.appEnv.StartupTime
 	}
 
-	if !ctx.lastUpdate.IsZero() && !ctx.lastUpdate.Before(lastUpdate) {
+	if !ctx.lastUpdate.Before(lastUpdate) {
 		logger.Debug("service list requested, but no update available")
 		return
 	}
@@ -124,7 +122,11 @@ func (self *listTunnelServicesHandler) listServices(ctx *listTunnelServicesReque
 		serviceList.Services = append(serviceList.Services, service)
 	}
 
-	serviceList.LastUpdate = []byte(lastUpdate.Format(time.RFC3339Nano))
+	t, err := lastUpdate.MarshalBinary()
+	if err != nil {
+		logger.WithError(err).Error("failed to marshal last update time")
+	}
+	serviceList.LastUpdate = t
 
 	body, err := proto.Marshal(serviceList)
 	if err != nil {

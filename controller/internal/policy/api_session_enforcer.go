@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/michaelquigley/pfxlog"
 	"github.com/openziti/edge/controller/env"
+	"github.com/openziti/edge/controller/model"
 	"github.com/openziti/edge/runner"
 	"github.com/sirupsen/logrus"
 	"time"
@@ -31,7 +32,7 @@ const (
 )
 
 type ApiSessionEnforcer struct {
-	appEnv         *env.AppEnv
+	appEnv         model.Env
 	sessionTimeout time.Duration
 	*runner.BaseOperation
 }
@@ -57,10 +58,19 @@ func (s *ApiSessionEnforcer) Run() error {
 	oldest := time.Now().Add(s.sessionTimeout * -1)
 	query := fmt.Sprintf("lastActivityAt < datetime(%s) limit %d", oldest.UTC().Format(time.RFC3339), maxDeletePerIteration)
 
+	log := pfxlog.Logger()
 	for i := 0; i < maxIterations; i++ {
 		ids := make([]string, 0, maxDeletePerIteration)
+
+		//iterate over API Sessions that do not have a recent enough lastAccessedAt
 		err := s.appEnv.GetHandlers().ApiSession.StreamIds(query, func(id string, err error) error {
-			if lastActivityAt, hasUnflushedValue := s.appEnv.GetHandlers().ApiSession.HeartbeatCollector.LastAccessedAt(id); !hasUnflushedValue || lastActivityAt.Before(oldest) {
+			if lastActivityAt, ok := s.appEnv.GetHandlers().ApiSession.HeartbeatCollector.LastAccessedAt(id); ok && lastActivityAt != nil {
+				log.Tracef("during API session enforcement lastAccessedAt check, API Session [%s] was found in the cache with time [%s]", id, lastActivityAt.String())
+				if lastActivityAt.Before(oldest) {
+					ids = append(ids, id)
+				}
+			} else {
+				log.Tracef("during API session enforcement lastAccessedAt check, API Session [%s] was not in the cache, using lastAccessedAt from db", id)
 				ids = append(ids, id)
 			}
 
