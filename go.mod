@@ -44,7 +44,7 @@ require (
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/netfoundry/secretstream v0.1.2
 	github.com/openziti/fabric v0.16.101
-	github.com/openziti/foundation v0.15.73
+	github.com/openziti/foundation v0.15.74-0.20210913144349-c5c7aa73c536
 	github.com/openziti/sdk-golang v0.15.91
 	github.com/orcaman/concurrent-map v0.0.0-20210106121528-16402b402231
 	github.com/pkg/errors v0.9.1
