@@ -1,5 +1,5 @@
 /*
-	Copyright NetFoundry, Inc.
+	Copyright 2019 NetFoundry, Inc.
 
 	Licensed under the Apache License, Version 2.0 (the "License");
 	you may not use this file except in compliance with the License.
@@ -14,19 +14,19 @@
 	limitations under the License.
 */
 
-package dns
+package xgress_geneve
 
-import "net"
+import (
+	"github.com/openziti/fabric/router/xgress"
+	"github.com/pkg/errors"
+)
 
-type Resolver interface {
-	AddHostname(string, net.IP) error
-	AddDomain(string, func(string) (net.IP, error)) error
-	Lookup(net.IP) (string, error)
-	RemoveHostname(string) error
-	Cleanup() error
+type Factory struct{}
+
+func (f Factory) CreateListener(optionsData xgress.OptionsData) (xgress.Listener, error) {
+	return &listener{}, nil
 }
 
-type domainEntry struct {
-	name  string
-	getIP func(string) (net.IP, error)
+func (f Factory) CreateDialer(optionsData xgress.OptionsData) (xgress.Dialer, error) {
+	return nil, errors.New("dialer not supported")
 }

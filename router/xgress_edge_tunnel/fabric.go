@@ -86,11 +86,21 @@ func (self *fabricProvider) updateApiSession(resp *edge_ctrl_pb.CreateApiSession
 
 	self.apiSessionToken = resp.Token
 	self.currentIdentity = &edge.CurrentIdentity{
-		Id:                       resp.IdentityId,
-		Name:                     resp.IdentityName,
-		DefaultHostingPrecedence: strings.ToLower(resp.DefaultHostingPrecedence.String()),
-		DefaultHostingCost:       uint16(resp.DefaultHostingCost),
-		AppData:                  map[string]interface{}{},
+		Id:                        resp.IdentityId,
+		Name:                      resp.IdentityName,
+		DefaultHostingPrecedence:  strings.ToLower(resp.DefaultHostingPrecedence.String()),
+		DefaultHostingCost:        uint16(resp.DefaultHostingCost),
+		AppData:                   map[string]interface{}{},
+		ServiceHostingPrecedences: map[string]interface{}{},
+		ServiceHostingCosts:       map[string]interface{}{},
+	}
+
+	for k, v := range resp.ServicePrecedences {
+		self.currentIdentity.ServiceHostingPrecedences[k] = v.GetZitiLabel()
+	}
+
+	for k, v := range resp.ServiceCosts {
+		self.currentIdentity.ServiceHostingCosts[k] = float64(v)
 	}
 
 	if resp.AppDataJson != "" {
@@ -202,7 +212,7 @@ func (self *fabricProvider) TunnelService(service tunnel.Service, terminatorIden
 		self.dialSessions.Set(service.GetName(), response.Session.SessionId)
 	}
 
-	xgConn := xgress_common.NewXgressConn(conn, halfClose)
+	xgConn := xgress_common.NewXgressConn(conn, halfClose, false)
 
 	if peerKey, ok := response.PeerData[edge.PublicKeyHeader]; ok {
 		if err := xgConn.SetupClientCrypto(keyPair, peerKey); err != nil {
