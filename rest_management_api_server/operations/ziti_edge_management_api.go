@@ -301,6 +301,9 @@ func NewZitiEdgeManagementAPI(spec *loads.Document) *ZitiEdgeManagementAPI {
 		CurrentIdentityEnrollMfaHandler: current_identity.EnrollMfaHandlerFunc(func(params current_identity.EnrollMfaParams, principal interface{}) middleware.Responder {
 			return middleware.NotImplemented("operation current_identity.EnrollMfa has not yet been implemented")
 		}),
+		CurrentAPISessionExtendCurrentIdentityAuthenticatorHandler: current_api_session.ExtendCurrentIdentityAuthenticatorHandlerFunc(func(params current_api_session.ExtendCurrentIdentityAuthenticatorParams, principal interface{}) middleware.Responder {
+			return middleware.NotImplemented("operation current_api_session.ExtendCurrentIdentityAuthenticator has not yet been implemented")
+		}),
 		DatabaseFixDataIntegrityHandler: database.FixDataIntegrityHandlerFunc(func(params database.FixDataIntegrityParams, principal interface{}) middleware.Responder {
 			return middleware.NotImplemented("operation database.FixDataIntegrity has not yet been implemented")
 		}),
@@ -519,6 +522,9 @@ func NewZitiEdgeManagementAPI(spec *loads.Document) *ZitiEdgeManagementAPI {
 		}),
 		RouterPatchTransitRouterHandler: router.PatchTransitRouterHandlerFunc(func(params router.PatchTransitRouterParams, principal interface{}) middleware.Responder {
 			return middleware.NotImplemented("operation router.PatchTransitRouter has not yet been implemented")
+		}),
+		EdgeRouterReEnrollEdgeRouterHandler: edge_router.ReEnrollEdgeRouterHandlerFunc(func(params edge_router.ReEnrollEdgeRouterParams, principal interface{}) middleware.Responder {
+			return middleware.NotImplemented("operation edge_router.ReEnrollEdgeRouter has not yet been implemented")
 		}),
 		IdentityRemoveIdentityMfaHandler: identity.RemoveIdentityMfaHandlerFunc(func(params identity.RemoveIdentityMfaParams, principal interface{}) middleware.Responder {
 			return middleware.NotImplemented("operation identity.RemoveIdentityMfa has not yet been implemented")
@@ -775,6 +781,8 @@ type ZitiEdgeManagementAPI struct {
 	IdentityDisassociateIdentitysServiceConfigsHandler identity.DisassociateIdentitysServiceConfigsHandler
 	// CurrentIdentityEnrollMfaHandler sets the operation handler for the enroll mfa operation
 	CurrentIdentityEnrollMfaHandler current_identity.EnrollMfaHandler
+	// CurrentAPISessionExtendCurrentIdentityAuthenticatorHandler sets the operation handler for the extend current identity authenticator operation
+	CurrentAPISessionExtendCurrentIdentityAuthenticatorHandler current_api_session.ExtendCurrentIdentityAuthenticatorHandler
 	// DatabaseFixDataIntegrityHandler sets the operation handler for the fix data integrity operation
 	DatabaseFixDataIntegrityHandler database.FixDataIntegrityHandler
 	// CertificateAuthorityGetCaJwtHandler sets the operation handler for the get ca jwt operation
@@ -921,6 +929,8 @@ type ZitiEdgeManagementAPI struct {
 	TerminatorPatchTerminatorHandler terminator.PatchTerminatorHandler
 	// RouterPatchTransitRouterHandler sets the operation handler for the patch transit router operation
 	RouterPatchTransitRouterHandler router.PatchTransitRouterHandler
+	// EdgeRouterReEnrollEdgeRouterHandler sets the operation handler for the re enroll edge router operation
+	EdgeRouterReEnrollEdgeRouterHandler edge_router.ReEnrollEdgeRouterHandler
 	// IdentityRemoveIdentityMfaHandler sets the operation handler for the remove identity mfa operation
 	IdentityRemoveIdentityMfaHandler identity.RemoveIdentityMfaHandler
 	// AuthenticatorUpdateAuthenticatorHandler sets the operation handler for the update authenticator operation
@@ -1256,6 +1266,9 @@ func (o *ZitiEdgeManagementAPI) Validate() error {
 	if o.CurrentIdentityEnrollMfaHandler == nil {
 		unregistered = append(unregistered, "current_identity.EnrollMfaHandler")
 	}
+	if o.CurrentAPISessionExtendCurrentIdentityAuthenticatorHandler == nil {
+		unregistered = append(unregistered, "current_api_session.ExtendCurrentIdentityAuthenticatorHandler")
+	}
 	if o.DatabaseFixDataIntegrityHandler == nil {
 		unregistered = append(unregistered, "database.FixDataIntegrityHandler")
 	}
@@ -1474,6 +1487,9 @@ func (o *ZitiEdgeManagementAPI) Validate() error {
 	}
 	if o.RouterPatchTransitRouterHandler == nil {
 		unregistered = append(unregistered, "router.PatchTransitRouterHandler")
+	}
+	if o.EdgeRouterReEnrollEdgeRouterHandler == nil {
+		unregistered = append(unregistered, "edge_router.ReEnrollEdgeRouterHandler")
 	}
 	if o.IdentityRemoveIdentityMfaHandler == nil {
 		unregistered = append(unregistered, "identity.RemoveIdentityMfaHandler")
@@ -1912,6 +1928,10 @@ func (o *ZitiEdgeManagementAPI) initHandlerCache() {
 	if o.handlers["POST"] == nil {
 		o.handlers["POST"] = make(map[string]http.Handler)
 	}
+	o.handlers["POST"]["/current-identity/authenticators/{id}/extend"] = current_api_session.NewExtendCurrentIdentityAuthenticator(o.context, o.CurrentAPISessionExtendCurrentIdentityAuthenticatorHandler)
+	if o.handlers["POST"] == nil {
+		o.handlers["POST"] = make(map[string]http.Handler)
+	}
 	o.handlers["POST"]["/database/fix-data-integrity"] = database.NewFixDataIntegrity(o.context, o.DatabaseFixDataIntegrityHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
@@ -2201,6 +2221,10 @@ func (o *ZitiEdgeManagementAPI) initHandlerCache() {
 		o.handlers["PATCH"] = make(map[string]http.Handler)
 	}
 	o.handlers["PATCH"]["/transit-routers/{id}"] = router.NewPatchTransitRouter(o.context, o.RouterPatchTransitRouterHandler)
+	if o.handlers["POST"] == nil {
+		o.handlers["POST"] = make(map[string]http.Handler)
+	}
+	o.handlers["POST"]["/edge-routers/{id}/re-enroll"] = edge_router.NewReEnrollEdgeRouter(o.context, o.EdgeRouterReEnrollEdgeRouterHandler)
 	if o.handlers["DELETE"] == nil {
 		o.handlers["DELETE"] = make(map[string]http.Handler)
 	}

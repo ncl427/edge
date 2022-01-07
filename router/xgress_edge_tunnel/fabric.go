@@ -22,10 +22,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/michaelquigley/pfxlog"
 	"github.com/netfoundry/secretstream/kx"
-	"github.com/openziti/edge/build"
 	"github.com/openziti/edge/pb/edge_ctrl_pb"
 	"github.com/openziti/edge/router/xgress_common"
 	"github.com/openziti/edge/tunnel"
+	"github.com/openziti/fabric/build"
 	"github.com/openziti/fabric/router/xgress"
 	"github.com/openziti/foundation/channel2"
 	"github.com/openziti/foundation/identity/identity"
@@ -43,7 +43,7 @@ import (
 
 func newProvider(factory *Factory, tunneler *tunneler) *fabricProvider {
 	return &fabricProvider{
-		ctrlCh:       factory,
+		factory:      factory,
 		tunneler:     tunneler,
 		dialSessions: cmap.New(),
 		bindSessions: cmap.New(),
@@ -51,7 +51,7 @@ func newProvider(factory *Factory, tunneler *tunneler) *fabricProvider {
 }
 
 type fabricProvider struct {
-	ctrlCh   xgress.CtrlChannel
+	factory  *Factory
 	tunneler *tunneler
 
 	apiSessionLock  sync.Mutex
@@ -156,7 +156,7 @@ func (self *fabricProvider) authenticate() error {
 		},
 	}
 
-	respMsg, err := self.ctrlCh.Channel().SendForReply(request, 30*time.Second)
+	respMsg, err := self.factory.Channel().SendForReply(request, 30*time.Second)
 
 	resp := &edge_ctrl_pb.CreateApiSessionResponse{}
 	if err = xgress_common.GetResultOrFailure(respMsg, err, resp); err != nil {
@@ -196,7 +196,7 @@ func (self *fabricProvider) TunnelService(service tunnel.Service, terminatorIden
 		PeerData:           peerData,
 	}
 
-	responseMsg, err := self.ctrlCh.Channel().SendForReply(request, service.GetDialTimeout())
+	responseMsg, err := self.factory.Channel().SendForReply(request, service.GetDialTimeout())
 
 	response := &edge_ctrl_pb.CreateCircuitForServiceResponse{}
 	if err = xgress_common.GetResultOrFailure(responseMsg, err, response); err != nil {
@@ -238,7 +238,6 @@ func (self *fabricProvider) HostService(hostCtx tunnel.HostingContext) (tunnel.H
 	terminator := &tunnelTerminator{
 		provider: self,
 		context:  hostCtx,
-		address:  uuid.NewString(),
 	}
 
 	go self.establishTerminatorWithRetry(terminator)
@@ -272,7 +271,11 @@ func (self *fabricProvider) establishTerminatorWithRetry(terminator *tunnelTermi
 }
 
 func (self *fabricProvider) establishTerminator(terminator *tunnelTerminator) error {
-	logger := pfxlog.Logger().WithField("service", terminator.context.ServiceName()).
+	terminator.address = uuid.NewString() // grab new id each time we retry
+
+	logger := pfxlog.Logger().
+		WithField("routerId", self.factory.id).
+		WithField("service", terminator.context.ServiceName()).
 		WithField("address", terminator.address)
 
 	keyPair, err := kx.NewKeyPair()
@@ -303,8 +306,10 @@ func (self *fabricProvider) establishTerminator(terminator *tunnelTerminator) er
 		Identity:    terminator.context.ListenOptions().Identity,
 	}
 
+	request.GetContentType()
+
 	response := &edge_ctrl_pb.CreateTunnelTerminatorResponse{}
-	responseMsg, err := self.ctrlCh.Channel().SendForReply(request, self.ctrlCh.DefaultRequestTimeout())
+	responseMsg, err := self.factory.Channel().SendForReply(request, self.factory.DefaultRequestTimeout())
 	if err = xgress_common.GetResultOrFailure(responseMsg, err, response); err != nil {
 		logger.WithError(err).Error("error creating terminator")
 		return err
@@ -333,7 +338,7 @@ func (self *fabricProvider) establishTerminator(terminator *tunnelTerminator) er
 
 func (self *fabricProvider) removeTerminator(terminator *tunnelTerminator) error {
 	msg := channel2.NewMessage(int32(edge_ctrl_pb.ContentType_RemoveTunnelTerminatorRequestType), []byte(terminator.terminatorId))
-	responseMsg, err := self.ctrlCh.Channel().SendAndWaitWithTimeout(msg, self.ctrlCh.DefaultRequestTimeout())
+	responseMsg, err := self.factory.Channel().SendAndWaitWithTimeout(msg, self.factory.DefaultRequestTimeout())
 	return xgress_common.CheckForFailureResult(responseMsg, err, edge_ctrl_pb.ContentType_RemoveTunnelTerminatorResponseType)
 }
 
@@ -365,7 +370,7 @@ func (self *fabricProvider) updateTerminator(terminatorId string, cost *uint16, 
 
 	logger.Debug("updating terminator")
 
-	responseMsg, err := self.ctrlCh.Channel().SendForReply(request, self.ctrlCh.DefaultRequestTimeout())
+	responseMsg, err := self.factory.Channel().SendForReply(request, self.factory.DefaultRequestTimeout())
 	if err := xgress_common.CheckForFailureResult(responseMsg, err, edge_ctrl_pb.ContentType_UpdateTunnelTerminatorResponseType); err != nil {
 		logger.WithError(err).Error("terminator update failed")
 		return err
@@ -384,7 +389,7 @@ func (self *fabricProvider) sendHealthEvent(terminatorId string, checkPassed boo
 		WithField("checkPassed", checkPassed)
 	logger.Debug("sending health event")
 
-	if err := self.ctrlCh.Channel().Send(msg); err != nil {
+	if err := self.factory.Channel().Send(msg); err != nil {
 		logger.WithError(err).Error("health event send failed")
 	} else {
 		logger.Debug("health event sent")
@@ -395,7 +400,7 @@ func (self *fabricProvider) sendHealthEvent(terminatorId string, checkPassed boo
 
 func (self *fabricProvider) requestServiceList(lastUpdateToken []byte) {
 	msg := channel2.NewMessage(int32(edge_ctrl_pb.ContentType_ListServicesRequestType), lastUpdateToken)
-	if err := self.ctrlCh.Channel().Send(msg); err != nil {
+	if err := self.factory.Channel().Send(msg); err != nil {
 		logrus.WithError(err).Error("failed to send service list request to controller")
 	}
 }
@@ -415,7 +420,9 @@ func (self *tunnelTerminator) SendHealthEvent(pass bool) error {
 
 func (self *tunnelTerminator) Close() error {
 	if self.closed.CompareAndSwap(false, true) {
-		log := logrus.WithField("service", self.context.ServiceName()).WithField("terminator", self.terminatorId)
+		log := logrus.WithField("service", self.context.ServiceName()).
+			WithField("routerId", self.provider.factory.id).
+			WithField("terminator", self.terminatorId)
 
 		log.Debug("closing tunnel terminator context")
 		self.context.OnClose()
@@ -424,7 +431,12 @@ func (self *tunnelTerminator) Close() error {
 		self.closeCallback()
 
 		log.Debug("removing tunnel terminator")
-		return self.provider.removeTerminator(self)
+		if err := self.provider.removeTerminator(self); err != nil {
+			log.WithError(err).Error("error while removing tunnel terminator")
+			return err
+		}
+		log.Info("removed tunnel terminator")
+		return nil
 	}
 	return nil
 }

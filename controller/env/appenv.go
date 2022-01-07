@@ -18,7 +18,6 @@ package env
 
 import (
 	"bytes"
-	"context"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/tls"
@@ -43,6 +42,7 @@ import (
 	clientOperations "github.com/openziti/edge/rest_client_api_server/operations"
 	managementServer "github.com/openziti/edge/rest_management_api_server"
 	managementOperations "github.com/openziti/edge/rest_management_api_server/operations"
+	"github.com/openziti/fabric/controller/api"
 	"github.com/openziti/fabric/controller/network"
 	"github.com/openziti/fabric/controller/xctrl"
 	"github.com/openziti/fabric/controller/xmgmt"
@@ -83,6 +83,7 @@ type AppEnv struct {
 	ManagementApi            *managementOperations.ZitiEdgeManagementAPI
 	ClientApi                *clientOperations.ZitiEdgeClientAPI
 	IdentityRefreshMap       cmap.ConcurrentMap
+	identityRefreshMeter     metrics.Meter
 	StartupTime              time.Time
 	InstanceId               string
 	findEnrollmentSignerOnce sync.Once
@@ -253,7 +254,6 @@ func (ae *AppEnv) FillRequestContext(rc *response.RequestContext) error {
 		}
 	}
 
-
 	if rc.ApiSession != nil {
 		//updates for api session timeouts
 		ae.GetHandlers().ApiSession.MarkActivityById(rc.ApiSession.Id)
@@ -319,6 +319,8 @@ func NewAppEnv(c *edgeConfig.Config, host HostController) *AppEnv {
 		IdentityRefreshMap: cmap.New(),
 		StartupTime:        time.Now().UTC(),
 	}
+
+	ae.identityRefreshMeter = ae.GetHostController().GetNetwork().GetMetricsRegistry().Meter("identity.refresh")
 
 	clientApi.APIAuthorizer = authorizer{}
 	managementApi.APIAuthorizer = authorizer{}
@@ -428,13 +430,12 @@ func (ae *AppEnv) CreateRequestContext(rw http.ResponseWriter, r *http.Request) 
 
 	requestContext := &response.RequestContext{
 		Id:                rid,
+		ResponseWriter:    rw,
+		Request:           r,
 		Body:              body,
 		Identity:          nil,
 		ApiSession:        nil,
 		ActivePermissions: []string{},
-		ResponseWriter:    rw,
-		Request:           r,
-		EventLogger:       &DefaultEventLogger{Ae: ae},
 	}
 
 	requestContext.Responder = response.NewResponder(requestContext)
@@ -442,26 +443,16 @@ func (ae *AppEnv) CreateRequestContext(rw http.ResponseWriter, r *http.Request) 
 	return requestContext
 }
 
-// ContextKey is used a custom type to avoid accidental context key collisions
-type ContextKey string
-
-const EdgeContextKey = ContextKey("edgeContext")
-
-func AddRequestContextToHttpContext(r *http.Request, rc *response.RequestContext) {
-	ctx := context.WithValue(r.Context(), EdgeContextKey, rc)
-	*r = *r.WithContext(ctx)
-}
-
 func GetRequestContextFromHttpContext(r *http.Request) (*response.RequestContext, error) {
-	val := r.Context().Value(EdgeContextKey)
+	val := r.Context().Value(api.ZitiContextKey)
 	if val == nil {
-		return nil, fmt.Errorf("value for key %s no found in context", EdgeContextKey)
+		return nil, fmt.Errorf("value for key %s no found in context", api.ZitiContextKey)
 	}
 
 	requestContext := val.(*response.RequestContext)
 
 	if requestContext == nil {
-		return nil, fmt.Errorf("value for key %s is not a request context", EdgeContextKey)
+		return nil, fmt.Errorf("value for key %s is not a request context", api.ZitiContextKey)
 	}
 
 	return requestContext, nil
@@ -472,15 +463,19 @@ func (ae *AppEnv) IsAllowed(responderFunc func(ae *AppEnv, rc *response.RequestC
 
 		rc, err := GetRequestContextFromHttpContext(request)
 
-		if err != nil {
-			pfxlog.Logger().WithError(err).Error("could not retrieve request context")
-			response.RespondWithError(writer, rc.Request, eid.New(), producer, err)
-			return
+		if rc == nil {
+			rc = ae.CreateRequestContext(writer, request)
 		}
 
 		rc.SetProducer(producer)
 		rc.SetEntityId(entityId)
 		rc.SetEntitySubId(entitySubId)
+
+		if err != nil {
+			pfxlog.Logger().WithError(err).Error("could not retrieve request context")
+			rc.RespondWithError(err)
+			return
+		}
 
 		for _, permission := range permissions {
 			if !permission.IsAllowed(rc.ActivePermissions...) {
@@ -499,6 +494,7 @@ func (ae *AppEnv) HandleServiceEvent(event *persistence.ServiceEvent) {
 
 func (ae *AppEnv) HandleServiceUpdatedEventForIdentityId(identityId string) {
 	ae.IdentityRefreshMap.Set(identityId, time.Now().UTC())
+	ae.identityRefreshMeter.Mark(1)
 }
 
 func (ae *AppEnv) SetEnrollmentSigningCert(serverCert *tls.Certificate) {

@@ -22,9 +22,9 @@ import (
 	"github.com/openziti/edge/controller/apierror"
 	"github.com/openziti/edge/controller/env"
 	"github.com/openziti/edge/controller/response"
-	"github.com/openziti/edge/controller/timeout"
 	"github.com/openziti/edge/rest_client_api_client"
 	"github.com/openziti/edge/rest_client_api_server"
+	"github.com/openziti/fabric/controller/api"
 	"github.com/openziti/fabric/xweb"
 	"github.com/pkg/errors"
 	"io/ioutil"
@@ -143,6 +143,7 @@ func (clientApi ClientApiHandler) newHandler(ae *env.AppEnv) http.Handler {
 	innerClientHandler := ae.ClientApi.Serve(nil)
 
 	handler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		start := time.Now()
 		rw.Header().Set(ZitiInstanceId, ae.InstanceId)
 
 		//if not /edge prefix and not /fabric, translate to "/edge/client/v<latest>", this is a hack
@@ -163,7 +164,7 @@ func (clientApi ClientApiHandler) newHandler(ae *env.AppEnv) http.Handler {
 
 		rc := ae.CreateRequestContext(rw, r)
 
-		env.AddRequestContextToHttpContext(r, rc)
+		api.AddRequestContextToHttpContext(r, rc)
 
 		err := ae.FillRequestContext(rc)
 		if err != nil {
@@ -175,7 +176,9 @@ func (clientApi ClientApiHandler) newHandler(ae *env.AppEnv) http.Handler {
 		response.AddHeaders(rc)
 
 		innerClientHandler.ServeHTTP(rw, r)
+		timer := ae.GetHostController().GetNetwork().GetMetricsRegistry().Timer(getMetricTimerName(r))
+		timer.UpdateSince(start)
 	})
 
-	return timeout.TimeoutHandler(wrapCorsHandler(handler), 10*time.Second, apierror.NewTimeoutError())
+	return api.TimeoutHandler(api.WrapCorsHandler(handler), 10*time.Second, apierror.NewTimeoutError(), response.EdgeResponseMapper{})
 }

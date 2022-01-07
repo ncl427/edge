@@ -43,6 +43,9 @@ import (
 // swagger:model authenticatorCreate
 type AuthenticatorCreate struct {
 
+	// The client certificate the identity will login with. Used only for method='cert'
+	CertPem string `json:"certPem,omitempty"`
+
 	// The id of an existing identity that will be assigned this authenticator
 	// Required: true
 	IdentityID *string `json:"identityId"`
@@ -51,16 +54,14 @@ type AuthenticatorCreate struct {
 	// Required: true
 	Method *string `json:"method"`
 
-	// The password the identity will login with, Used only for method='updb'
-	// Required: true
-	Password *string `json:"password"`
+	// The password the identity will login with. Used only for method='updb'
+	Password string `json:"password,omitempty"`
 
 	// tags
 	Tags *Tags `json:"tags,omitempty"`
 
 	// The username that the identity will login with. Used only for method='updb'
-	// Required: true
-	Username *string `json:"username"`
+	Username string `json:"username,omitempty"`
 }
 
 // Validate validates this authenticator create
@@ -75,15 +76,7 @@ func (m *AuthenticatorCreate) Validate(formats strfmt.Registry) error {
 		res = append(res, err)
 	}
 
-	if err := m.validatePassword(formats); err != nil {
-		res = append(res, err)
-	}
-
 	if err := m.validateTags(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.validateUsername(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -111,15 +104,6 @@ func (m *AuthenticatorCreate) validateMethod(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *AuthenticatorCreate) validatePassword(formats strfmt.Registry) error {
-
-	if err := validate.Required("password", "body", m.Password); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (m *AuthenticatorCreate) validateTags(formats strfmt.Registry) error {
 	if swag.IsZero(m.Tags) { // not required
 		return nil
@@ -129,18 +113,11 @@ func (m *AuthenticatorCreate) validateTags(formats strfmt.Registry) error {
 		if err := m.Tags.Validate(formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("tags")
+			} else if ce, ok := err.(*errors.CompositeError); ok {
+				return ce.ValidateName("tags")
 			}
 			return err
 		}
-	}
-
-	return nil
-}
-
-func (m *AuthenticatorCreate) validateUsername(formats strfmt.Registry) error {
-
-	if err := validate.Required("username", "body", m.Username); err != nil {
-		return err
 	}
 
 	return nil
@@ -166,6 +143,8 @@ func (m *AuthenticatorCreate) contextValidateTags(ctx context.Context, formats s
 		if err := m.Tags.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("tags")
+			} else if ce, ok := err.(*errors.CompositeError); ok {
+				return ce.ValidateName("tags")
 			}
 			return err
 		}

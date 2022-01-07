@@ -21,6 +21,7 @@ import (
 	"fmt"
 	sync2 "github.com/openziti/edge/controller/sync_strats"
 	"github.com/openziti/edge/pb/edge_ctrl_pb"
+	"github.com/openziti/fabric/controller/api_impl"
 	"io/ioutil"
 	"sync"
 	"time"
@@ -114,6 +115,8 @@ func NewController(cfg config.Configurable, host env.HostController) (*Controlle
 		panic(err)
 	}
 
+	api_impl.OverrideRequestWrapper(&fabricWrapper{ae: c.AppEnv})
+
 	return c, nil
 }
 
@@ -156,7 +159,8 @@ func (c *Controller) GetCtrlHandlers(ch channel2.Channel) []channel2.ReceiveHand
 		handler_edge_ctrl.NewRemoveTunnelTerminatorHandler(c.AppEnv, ch),
 		handler_edge_ctrl.NewListTunnelServicesHandler(c.AppEnv, ch, tunnelState),
 		handler_edge_ctrl.NewTunnelHealthEventHandler(c.AppEnv, ch),
-		handler_edge_ctrl.NewextendEnrollmentHandler(c.AppEnv),
+		handler_edge_ctrl.NewExtendEnrollmentHandler(c.AppEnv),
+		handler_edge_ctrl.NewExtendEnrollmentVerifyHandler(c.AppEnv),
 	}
 }
 
