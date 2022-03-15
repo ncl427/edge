@@ -17,7 +17,6 @@
 package persistence
 
 import (
-	"github.com/michaelquigley/pfxlog"
 	"github.com/openziti/fabric/controller/db"
 	"github.com/openziti/foundation/storage/ast"
 	"github.com/openziti/foundation/storage/boltz"
@@ -25,10 +24,12 @@ import (
 	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
 	"reflect"
+	"time"
 )
 
 type Stores struct {
-	DbProvider DbProvider
+	DbProvider      DbProvider
+	EventualEventer EventualEventer
 
 	// fabric stores
 	Router     db.RouterStore
@@ -37,6 +38,7 @@ type Stores struct {
 
 	ApiSession              ApiSessionStore
 	ApiSessionCertificate   ApiSessionCertificateStore
+	EventualEvent           EventualEventStore
 	Ca                      CaStore
 	Config                  ConfigStore
 	ConfigType              ConfigTypeStore
@@ -60,6 +62,19 @@ type Stores struct {
 	storeMap                map[reflect.Type]boltz.CrudStore
 }
 
+func (stores *Stores) addStoresToIntegrityCheck(fabricStores *db.Stores) {
+	val := reflect.ValueOf(stores).Elem()
+	for i := 0; i < val.NumField(); i++ {
+		f := val.Field(i)
+		if f.CanInterface() {
+			// filter by the edge Store interface, so we don't recheck fabric stores, which are already being checked
+			if store, ok := f.Interface().(Store); ok {
+				fabricStores.AddCheckable(store)
+			}
+		}
+	}
+}
+
 func (stores *Stores) buildStoreMap() {
 	val := reflect.ValueOf(stores).Elem()
 	for i := 0; i < val.NumField(); i++ {
@@ -73,7 +88,36 @@ func (stores *Stores) buildStoreMap() {
 	}
 }
 
-func (stores *Stores) GetStoreList() []Store {
+func (stores *Stores) GetEntityCounts(dbProvider DbProvider) (map[string]int64, error) {
+	result := map[string]int64{}
+	for _, store := range stores.storeMap {
+		err := dbProvider.GetDb().View(func(tx *bbolt.Tx) error {
+			key := store.GetEntityType()
+			if store.IsChildStore() {
+				if _, ok := store.(TransitRouterStore); ok {
+					// skip transit routers, since count will be == fabric routers
+					return nil
+				} else {
+					key = store.GetEntityType() + ".edge"
+				}
+			}
+
+			_, count, err := store.QueryIds(tx, "true limit 1")
+			if err != nil {
+				return err
+			}
+			result[key] = count
+			return nil
+		})
+
+		if err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
+}
+
+func (stores *Stores) getStoresForInit() []Store {
 	var result []Store
 	for _, crudStore := range stores.storeMap {
 		if store, ok := crudStore.(Store); ok {
@@ -87,36 +131,9 @@ func (stores *Stores) GetStoreForEntity(entity boltz.Entity) boltz.CrudStore {
 	return stores.storeMap[reflect.TypeOf(entity)]
 }
 
-func (stores *Stores) CheckIntegrity(fix bool, errorHandler func(error, bool)) error {
-	if fix {
-		return stores.DbProvider.GetDb().Update(func(tx *bbolt.Tx) error {
-			return stores.CheckIntegrityInTx(tx, fix, errorHandler)
-		})
-	}
-
-	return stores.DbProvider.GetDb().View(func(tx *bbolt.Tx) error {
-		return stores.CheckIntegrityInTx(tx, fix, errorHandler)
-	})
-}
-
-func (stores *Stores) CheckIntegrityInTx(tx *bbolt.Tx, fix bool, errorHandler func(error, bool)) error {
-	if fix {
-		pfxlog.Logger().Info("creating database snapshot before attempting to fix data integrity issues")
-		if err := stores.DbProvider.GetDb().Snapshot(tx); err != nil {
-			return err
-		}
-	}
-
-	for _, store := range stores.storeMap {
-		if err := store.CheckIntegrity(tx, fix, errorHandler); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 type stores struct {
-	DbProvider DbProvider
+	DbProvider      DbProvider
+	EventualEventer EventualEventer
 
 	// fabric stores
 	Router     db.RouterStore
@@ -124,6 +141,7 @@ type stores struct {
 	Terminator db.TerminatorStore
 
 	apiSession              *apiSessionStoreImpl
+	eventualEvent           *eventualEventStoreImpl
 	ca                      *caStoreImpl
 	config                  *configStoreImpl
 	configType              *configTypeStoreImpl
@@ -153,10 +171,12 @@ func NewBoltStores(dbProvider DbProvider) (*Stores, error) {
 		DbProvider: dbProvider,
 	}
 
+	internalStores.eventualEvent = newEventualEventStore(internalStores)
+	internalStores.EventualEventer = NewEventualEventerBbolt(dbProvider, internalStores.eventualEvent, 2*time.Second, 1000)
+
 	internalStores.Terminator = dbProvider.GetStores().Terminator
 	internalStores.Router = dbProvider.GetStores().Router
 	internalStores.Service = dbProvider.GetStores().Service
-
 	internalStores.apiSession = newApiSessionStore(internalStores)
 	internalStores.apiSessionCertificate = newApiSessionCertificateStore(internalStores)
 	internalStores.authenticator = newAuthenticatorStore(internalStores)
@@ -188,6 +208,7 @@ func NewBoltStores(dbProvider DbProvider) (*Stores, error) {
 
 		ApiSession:              internalStores.apiSession,
 		ApiSessionCertificate:   internalStores.apiSessionCertificate,
+		EventualEvent:           internalStores.eventualEvent,
 		Ca:                      internalStores.ca,
 		Config:                  internalStores.config,
 		ConfigType:              internalStores.configType,
@@ -211,6 +232,8 @@ func NewBoltStores(dbProvider DbProvider) (*Stores, error) {
 		storeMap: make(map[reflect.Type]boltz.CrudStore),
 	}
 
+	externalStores.EventualEventer = internalStores.EventualEventer
+
 	// The Index store is used for querying indexes. It's a convenient store with only a single value (id), which
 	// is only ever queried using an index set cursor
 	externalStores.Index = boltz.NewBaseStore("invalid", func(id string) error {
@@ -219,7 +242,7 @@ func NewBoltStores(dbProvider DbProvider) (*Stores, error) {
 	externalStores.Index.AddIdSymbol("id", ast.NodeTypeString)
 
 	externalStores.buildStoreMap()
-	storeList := externalStores.GetStoreList()
+	storeList := externalStores.getStoresForInit()
 
 	err := dbProvider.GetDb().Update(func(tx *bbolt.Tx) error {
 		for _, store := range storeList {
@@ -233,6 +256,8 @@ func NewBoltStores(dbProvider DbProvider) (*Stores, error) {
 		}
 		return nil
 	})
+
+	externalStores.addStoresToIntegrityCheck(dbProvider.GetStores())
 
 	errorHolder.SetError(err)
 	if errorHolder.HasError() {

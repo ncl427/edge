@@ -19,17 +19,17 @@ package handler_edge_ctrl
 import (
 	"github.com/golang/protobuf/proto"
 	"github.com/michaelquigley/pfxlog"
+	"github.com/openziti/channel"
 	"github.com/openziti/edge/controller/env"
 	"github.com/openziti/edge/controller/persistence"
 	"github.com/openziti/edge/pb/edge_ctrl_pb"
-	"github.com/openziti/foundation/channel2"
 )
 
 type createCircuitHandler struct {
 	baseRequestHandler
 }
 
-func NewCreateCircuitHandler(appEnv *env.AppEnv, ch channel2.Channel) channel2.ReceiveHandler {
+func NewCreateCircuitHandler(appEnv *env.AppEnv, ch channel.Channel) channel.TypedReceiveHandler {
 	return &createCircuitHandler{
 		baseRequestHandler: baseRequestHandler{
 			ch:     ch,
@@ -55,14 +55,14 @@ func (self *createCircuitHandler) sendResponse(ctx *CreateCircuitRequestContext,
 		return
 	}
 
-	responseMsg := channel2.NewMessage(response.GetContentType(), body)
+	responseMsg := channel.NewMessage(response.GetContentType(), body)
 	responseMsg.ReplyTo(ctx.msg)
 	if err = self.ch.Send(responseMsg); err != nil {
 		log.WithError(err).WithField("token", ctx.req.SessionToken).Error("failed to send create circuit response")
 	}
 }
 
-func (self *createCircuitHandler) HandleReceive(msg *channel2.Message, ch channel2.Channel) {
+func (self *createCircuitHandler) HandleReceive(msg *channel.Message, ch channel.Channel) {
 	req := &edge_ctrl_pb.CreateCircuitRequest{}
 	if err := proto.Unmarshal(msg.Body, req); err != nil {
 		pfxlog.ContextLogger(ch.Label()).WithError(err).Error("could not unmarshal CreateCircuitRequest")

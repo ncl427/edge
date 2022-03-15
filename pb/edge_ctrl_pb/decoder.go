@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/michaelquigley/pfxlog"
-	"github.com/openziti/foundation/channel2"
+	"github.com/openziti/channel"
 	"strings"
 )
 
@@ -28,12 +28,12 @@ type Decoder struct{}
 
 const DECODER = "edge_ctrl"
 
-func (d Decoder) Decode(msg *channel2.Message) ([]byte, bool) {
+func (d Decoder) Decode(msg *channel.Message) ([]byte, bool) {
 	switch msg.ContentType {
 	case int32(ContentType_ServerHelloType):
 		request := &ServerHello{}
 		if err := proto.Unmarshal(msg.Body, request); err == nil {
-			meta := channel2.NewTraceMessageDecode(DECODER, "Server Hello")
+			meta := channel.NewTraceMessageDecode(DECODER, "Server Hello")
 			meta["version"] = request.Version
 			var extraData []string
 			for k, v := range request.Data {
@@ -49,7 +49,7 @@ func (d Decoder) Decode(msg *channel2.Message) ([]byte, bool) {
 	case int32(ContentType_ClientHelloType):
 		request := &ClientHello{}
 		if err := proto.Unmarshal(msg.Body, request); err == nil {
-			meta := channel2.NewTraceMessageDecode(DECODER, "Client Hello")
+			meta := channel.NewTraceMessageDecode(DECODER, "Client Hello")
 			meta["version"] = request.Version
 			meta["hostname"] = request.Hostname
 			meta["protocols"] = strings.Join(request.Protocols, ",")
@@ -66,14 +66,14 @@ func (d Decoder) Decode(msg *channel2.Message) ([]byte, bool) {
 		}
 
 	case int32(ContentType_ErrorType):
-		meta := channel2.NewTraceMessageDecode(DECODER, "Edge Error")
+		meta := channel.NewTraceMessageDecode(DECODER, "Edge Error")
 		meta["error"] = string(msg.Body)
 		return meta.MarshalResult()
 
 	case int32(ContentType_SessionRemovedType):
 		request := &SessionRemoved{}
 		if err := proto.Unmarshal(msg.Body, request); err == nil {
-			meta := channel2.NewTraceMessageDecode(DECODER, "Session Removed")
+			meta := channel.NewTraceMessageDecode(DECODER, "Session Removed")
 			meta["ids"] = strings.Join(request.Ids, ",")
 			meta["tokens"] = strings.Join(request.Tokens, ",")
 			return meta.MarshalResult()
@@ -85,7 +85,7 @@ func (d Decoder) Decode(msg *channel2.Message) ([]byte, bool) {
 	case int32(ContentType_CreateCircuitRequestType):
 		request := &CreateCircuitRequest{}
 		if err := proto.Unmarshal(msg.Body, request); err == nil {
-			meta := channel2.NewTraceMessageDecode(DECODER, "Create Circuit")
+			meta := channel.NewTraceMessageDecode(DECODER, "Create Circuit")
 			meta["sessionToken"] = request.SessionToken
 			meta["terminatorIdentity"] = request.TerminatorIdentity
 			meta["fingerprints"] = strings.Join(request.Fingerprints, ",")
@@ -98,7 +98,7 @@ func (d Decoder) Decode(msg *channel2.Message) ([]byte, bool) {
 	case int32(ContentType_CreateCircuitResponseType):
 		request := &CreateCircuitResponse{}
 		if err := proto.Unmarshal(msg.Body, request); err == nil {
-			meta := channel2.NewTraceMessageDecode(DECODER, "Create Circuit Response")
+			meta := channel.NewTraceMessageDecode(DECODER, "Create Circuit Response")
 			meta["circuitId"] = request.CircuitId
 			meta["address"] = request.Address
 			return meta.MarshalResult()

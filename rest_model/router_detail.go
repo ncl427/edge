@@ -44,6 +44,12 @@ import (
 type RouterDetail struct {
 	BaseEntity
 
+	// cost
+	// Required: true
+	// Maximum: 65535
+	// Minimum: 0
+	Cost *int64 `json:"cost"`
+
 	// enrollment created at
 	// Format: date-time
 	EnrollmentCreatedAt *strfmt.DateTime `json:"enrollmentCreatedAt,omitempty"`
@@ -74,6 +80,10 @@ type RouterDetail struct {
 	// Required: true
 	Name *string `json:"name"`
 
+	// no traversal
+	// Required: true
+	NoTraversal *bool `json:"noTraversal"`
+
 	// unverified cert pem
 	UnverifiedCertPem *string `json:"unverifiedCertPem"`
 
@@ -92,6 +102,8 @@ func (m *RouterDetail) UnmarshalJSON(raw []byte) error {
 
 	// AO1
 	var dataAO1 struct {
+		Cost *int64 `json:"cost"`
+
 		EnrollmentCreatedAt *strfmt.DateTime `json:"enrollmentCreatedAt,omitempty"`
 
 		EnrollmentExpiresAt *strfmt.DateTime `json:"enrollmentExpiresAt,omitempty"`
@@ -108,6 +120,8 @@ func (m *RouterDetail) UnmarshalJSON(raw []byte) error {
 
 		Name *string `json:"name"`
 
+		NoTraversal *bool `json:"noTraversal"`
+
 		UnverifiedCertPem *string `json:"unverifiedCertPem"`
 
 		UnverifiedFingerprint *string `json:"unverifiedFingerprint"`
@@ -115,6 +129,8 @@ func (m *RouterDetail) UnmarshalJSON(raw []byte) error {
 	if err := swag.ReadJSON(raw, &dataAO1); err != nil {
 		return err
 	}
+
+	m.Cost = dataAO1.Cost
 
 	m.EnrollmentCreatedAt = dataAO1.EnrollmentCreatedAt
 
@@ -131,6 +147,8 @@ func (m *RouterDetail) UnmarshalJSON(raw []byte) error {
 	m.IsVerified = dataAO1.IsVerified
 
 	m.Name = dataAO1.Name
+
+	m.NoTraversal = dataAO1.NoTraversal
 
 	m.UnverifiedCertPem = dataAO1.UnverifiedCertPem
 
@@ -149,6 +167,8 @@ func (m RouterDetail) MarshalJSON() ([]byte, error) {
 	}
 	_parts = append(_parts, aO0)
 	var dataAO1 struct {
+		Cost *int64 `json:"cost"`
+
 		EnrollmentCreatedAt *strfmt.DateTime `json:"enrollmentCreatedAt,omitempty"`
 
 		EnrollmentExpiresAt *strfmt.DateTime `json:"enrollmentExpiresAt,omitempty"`
@@ -165,10 +185,14 @@ func (m RouterDetail) MarshalJSON() ([]byte, error) {
 
 		Name *string `json:"name"`
 
+		NoTraversal *bool `json:"noTraversal"`
+
 		UnverifiedCertPem *string `json:"unverifiedCertPem"`
 
 		UnverifiedFingerprint *string `json:"unverifiedFingerprint"`
 	}
+
+	dataAO1.Cost = m.Cost
 
 	dataAO1.EnrollmentCreatedAt = m.EnrollmentCreatedAt
 
@@ -185,6 +209,8 @@ func (m RouterDetail) MarshalJSON() ([]byte, error) {
 	dataAO1.IsVerified = m.IsVerified
 
 	dataAO1.Name = m.Name
+
+	dataAO1.NoTraversal = m.NoTraversal
 
 	dataAO1.UnverifiedCertPem = m.UnverifiedCertPem
 
@@ -204,6 +230,10 @@ func (m *RouterDetail) Validate(formats strfmt.Registry) error {
 
 	// validation for a type composition with BaseEntity
 	if err := m.BaseEntity.Validate(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateCost(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -231,9 +261,30 @@ func (m *RouterDetail) Validate(formats strfmt.Registry) error {
 		res = append(res, err)
 	}
 
+	if err := m.validateNoTraversal(formats); err != nil {
+		res = append(res, err)
+	}
+
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
+	return nil
+}
+
+func (m *RouterDetail) validateCost(formats strfmt.Registry) error {
+
+	if err := validate.Required("cost", "body", m.Cost); err != nil {
+		return err
+	}
+
+	if err := validate.MinimumInt("cost", "body", *m.Cost, 0, false); err != nil {
+		return err
+	}
+
+	if err := validate.MaximumInt("cost", "body", *m.Cost, 65535, false); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -293,6 +344,15 @@ func (m *RouterDetail) validateIsVerified(formats strfmt.Registry) error {
 func (m *RouterDetail) validateName(formats strfmt.Registry) error {
 
 	if err := validate.Required("name", "body", m.Name); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *RouterDetail) validateNoTraversal(formats strfmt.Registry) error {
+
+	if err := validate.Required("noTraversal", "body", m.NoTraversal); err != nil {
 		return err
 	}
 

@@ -18,6 +18,8 @@ package model
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/michaelquigley/pfxlog"
 	"github.com/openziti/edge/controller/apierror"
 	"github.com/openziti/edge/controller/persistence"
@@ -28,7 +30,6 @@ import (
 	"github.com/openziti/foundation/storage/boltz"
 	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
-	"strconv"
 )
 
 func NewEdgeRouterHandler(env Env) *EdgeRouterHandler {
@@ -39,6 +40,8 @@ func NewEdgeRouterHandler(env Env) *EdgeRouterHandler {
 			persistence.FieldEdgeRouterIsTunnelerEnabled: struct{}{},
 			persistence.FieldRoleAttributes:              struct{}{},
 			boltz.FieldTags:                              struct{}{},
+			db.FieldRouterCost:                           struct{}{},
+			db.FieldRouterNoTraversal:                    struct{}{},
 		},
 	}
 	handler.impl = handler
@@ -149,10 +152,12 @@ func (handler *EdgeRouterHandler) ListForSession(sessionId string) (*EdgeRouterL
 func (handler *EdgeRouterHandler) ListForIdentityAndService(identityId, serviceId string, limit *int) (*EdgeRouterListResult, error) {
 	var list *EdgeRouterListResult
 	var err error
-	handler.env.GetDbProvider().GetDb().View(func(tx *bbolt.Tx) error {
+	if txErr := handler.env.GetDbProvider().GetDb().View(func(tx *bbolt.Tx) error {
 		list, err = handler.ListForIdentityAndServiceWithTx(tx, identityId, serviceId, limit)
 		return nil
-	})
+	}); txErr != nil {
+		return nil, txErr
+	}
 
 	return list, err
 }
@@ -260,6 +265,63 @@ func (handler *EdgeRouterHandler) collectEnrollmentsInTx(tx *bbolt.Tx, id string
 	return nil
 }
 
+// ReEnroll creates a new JWT enrollment for an existing edge router. If the edge router already exists
+// with a JWT, a new JWT is created. If the edge router was already enrolled, all record of the enrollment is
+// reset and the edge router is disconnected forcing the edge router to complete enrollment before connecting.
+func (handler *EdgeRouterHandler) ReEnroll(router *EdgeRouter) error {
+	log := pfxlog.Logger().WithField("routerId", router.Id)
+
+	log.Info("attempting to set edge router state to unenrolled")
+	enrollment := &Enrollment{
+		BaseEntity:   models.BaseEntity{},
+		Method:       MethodEnrollEdgeRouterOtt,
+		EdgeRouterId: &router.Id,
+	}
+
+	if err := enrollment.FillJwtInfo(handler.env, router.Id); err != nil {
+		return fmt.Errorf("unable to fill jwt info for re-enrolling edge router: %v", err)
+	}
+
+	err := handler.GetDb().Update(func(tx *bbolt.Tx) error {
+		ctx := boltz.NewMutateContext(tx)
+		if id, err := handler.GetEnv().GetHandlers().Enrollment.createEntityInTx(ctx, enrollment); err != nil {
+			return fmt.Errorf("could not create enrollment for re-enrolling edge router: %v", err)
+		} else {
+			log.WithField("enrollmentId", id).Infof("edge router re-enrollment entity created")
+		}
+		router.Fingerprint = nil
+		router.CertPem = nil
+		router.IsVerified = false
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("unabled to alter db for re-enrolling edge router: %v", err)
+	}
+
+	if err := handler.PatchUnrestricted(router, boltz.MapFieldChecker{
+		db.FieldRouterFingerprint:             struct{}{},
+		persistence.FieldEdgeRouterCertPEM:    struct{}{},
+		persistence.FieldEdgeRouterIsVerified: struct{}{},
+	}); err != nil {
+		log.WithError(err).Error("unable to patch re-enrolling edge router")
+		return errors.Wrap(err, "unable to patch re-enrolling edge router")
+	}
+
+	log.Info("closing existing connections for re-enrolling edge router")
+	connectedRouter := handler.env.GetHostController().GetNetwork().GetConnectedRouter(router.Id)
+	if connectedRouter.Control != nil && !connectedRouter.Control.IsClosed() {
+		log = log.WithField("channel", connectedRouter.Control.Id())
+		log.Info("closing channel, router is flagged for re-enrollment and an existing open channel was found")
+		if err := connectedRouter.Control.Close(); err != nil {
+			log.Warnf("unexpected error closing channel for router flagged for re-enrollment: %v", err)
+		}
+	}
+
+	return nil
+}
+
 type ExtendedCerts struct {
 	RawClientCert []byte
 	RawServerCert []byte
@@ -303,9 +365,6 @@ func (handler *EdgeRouterHandler) ExtendEnrollment(router *EdgeRouter, clientCsr
 	if err != nil {
 		return nil, err
 	}
-
-	//Otherwise, the controller will continue to use old fingerprint if the router is cached
-	handler.env.GetHostController().GetNetwork().Routers.UpdateCachedFingerprint(router.Id, fingerprint)
 
 	return &ExtendedCerts{
 		RawClientCert: clientCertRaw,
@@ -370,18 +429,12 @@ func (handler *EdgeRouterHandler) ExtendEnrollmentVerify(router *EdgeRouter) err
 		router.UnverifiedFingerprint = nil
 		router.UnverifiedCertPem = nil
 
-		if err := handler.PatchUnrestricted(router, boltz.MapFieldChecker{
+		return handler.PatchUnrestricted(router, boltz.MapFieldChecker{
 			db.FieldRouterFingerprint:                        struct{}{},
 			persistence.FieldCaCertPem:                       struct{}{},
 			persistence.FieldEdgeRouterUnverifiedCertPEM:     struct{}{},
 			persistence.FieldEdgeRouterUnverifiedFingerprint: struct{}{},
-		}); err == nil {
-			//Otherwise, the controller will continue to use old fingerprint if the router is cached
-			handler.env.GetHostController().GetNetwork().Routers.UpdateCachedFingerprint(router.Id, *router.Fingerprint)
-			return nil
-		} else {
-			return err
-		}
+		})
 	}
 
 	return errors.New("no outstanding verification necessary")

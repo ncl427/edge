@@ -18,11 +18,11 @@ package sync_strats
 
 import (
 	"github.com/michaelquigley/pfxlog"
+	"github.com/openziti/channel"
 	"github.com/openziti/edge/controller/env"
 	"github.com/openziti/edge/controller/model"
 	"github.com/openziti/edge/eid"
 	"github.com/openziti/fabric/controller/network"
-	"github.com/openziti/foundation/channel2"
 	"github.com/openziti/foundation/util/concurrenz"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -36,7 +36,7 @@ type RouterSender struct {
 	Id          string
 	EdgeRouter  *model.EdgeRouter
 	Router      *network.Router
-	send        chan *channel2.Message
+	send        chan *channel.Message
 	closeNotify chan struct{}
 	running     concurrenz.AtomicBoolean
 
@@ -48,7 +48,7 @@ func newRouterSender(edgeRouter *model.EdgeRouter, router *network.Router, sendB
 		Id:          eid.New(),
 		EdgeRouter:  edgeRouter,
 		Router:      router,
-		send:        make(chan *channel2.Message, sendBufferSize),
+		send:        make(chan *channel.Message, sendBufferSize),
 		closeNotify: make(chan struct{}, 0),
 		running:     concurrenz.AtomicBoolean(1),
 		RouterState: env.NewLockingRouterStatus(),
@@ -93,7 +93,7 @@ func (rtx *RouterSender) logger() *logrus.Entry {
 		WithField("routerChannelIsOpen", !rtx.Router.Control.IsClosed())
 }
 
-func (rtx *RouterSender) Send(msg *channel2.Message) error {
+func (rtx *RouterSender) Send(msg *channel.Message) error {
 	if !rtx.running.Get() {
 		rtx.logger().Errorf("cannot send to router [%s], rtx'er is stopped", rtx.Router.Id)
 		return errors.Errorf("cannot send to router [%s], rtx'er is stopped", rtx.Router.Id)
@@ -160,19 +160,4 @@ func (m *routerTxMap) Range(callback func(entries *RouterSender)) {
 	for _, rtx := range rtxs {
 		callback(rtx)
 	}
-}
-
-var _ channel2.ReceiveHandler = &receiveHandlerFunc{}
-
-type receiveHandlerFunc struct {
-	contentType int32
-	handler     func(m *channel2.Message, ch channel2.Channel)
-}
-
-func (r receiveHandlerFunc) ContentType() int32 {
-	return r.contentType
-}
-
-func (r receiveHandlerFunc) HandleReceive(m *channel2.Message, ch channel2.Channel) {
-	r.handler(m, ch)
 }

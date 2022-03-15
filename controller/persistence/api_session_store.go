@@ -17,7 +17,9 @@
 package persistence
 
 import (
+	"fmt"
 	"github.com/kataras/go-events"
+	"github.com/michaelquigley/pfxlog"
 	"github.com/openziti/edge/eid"
 	"github.com/openziti/foundation/storage/ast"
 	"github.com/openziti/foundation/storage/boltz"
@@ -33,19 +35,22 @@ const (
 	FieldApiSessionMfaComplete    = "mfaComplete"
 	FieldApiSessionMfaRequired    = "mfaRequired"
 	FieldApiSessionLastActivityAt = "lastActivityAt"
+	FieldApiSessionAuthenticator  = "authenticator"
 
-	EventFullyAuthenticated events.EventName = "FULLY_AUTHENTICATED"
+	EventFullyAuthenticated       events.EventName = "FULLY_AUTHENTICATED"
+	EventualEventApiSessionDelete                  = "ApiSessionDelete"
 )
 
 type ApiSession struct {
 	boltz.BaseExtEntity
-	IdentityId     string
-	Token          string
-	IPAddress      string
-	ConfigTypes    []string
-	MfaComplete    bool
-	MfaRequired    bool
-	LastActivityAt time.Time
+	IdentityId      string
+	Token           string
+	IPAddress       string
+	ConfigTypes     []string
+	MfaComplete     bool
+	MfaRequired     bool
+	LastActivityAt  time.Time
+	AuthenticatorId string
 }
 
 func NewApiSession(identityId string) *ApiSession {
@@ -64,6 +69,7 @@ func (entity *ApiSession) LoadValues(_ boltz.CrudStore, bucket *boltz.TypedBucke
 	entity.IPAddress = bucket.GetStringWithDefault(FieldApiSessionIPAddress, "")
 	entity.MfaComplete = bucket.GetBoolWithDefault(FieldApiSessionMfaComplete, false)
 	entity.MfaRequired = bucket.GetBoolWithDefault(FieldApiSessionMfaRequired, false)
+	entity.AuthenticatorId = bucket.GetStringWithDefault(FieldApiSessionAuthenticator, "")
 	lastActivityAt := bucket.GetTime(FieldApiSessionLastActivityAt) //not orError due to migration v18
 
 	if lastActivityAt != nil {
@@ -79,6 +85,7 @@ func (entity *ApiSession) SetValues(ctx *boltz.PersistContext) {
 	ctx.SetString(FieldApiSessionIPAddress, entity.IPAddress)
 	ctx.SetBool(FieldApiSessionMfaComplete, entity.MfaComplete)
 	ctx.SetBool(FieldApiSessionMfaRequired, entity.MfaRequired)
+	ctx.SetString(FieldApiSessionAuthenticator, entity.AuthenticatorId)
 	ctx.SetTimeP(FieldApiSessionLastActivityAt, &entity.LastActivityAt)
 }
 
@@ -98,6 +105,8 @@ func newApiSessionStore(stores *stores) *apiSessionStoreImpl {
 	store := &apiSessionStoreImpl{
 		baseStore: newBaseStore(stores, EntityTypeApiSessions),
 	}
+
+	stores.EventualEventer.AddEventualListener(EventualEventApiSessionDelete, store.onEventualDelete)
 	store.InitImpl(store)
 	return store
 }
@@ -107,6 +116,40 @@ type apiSessionStoreImpl struct {
 
 	indexToken     boltz.ReadIndex
 	symbolIdentity boltz.EntitySymbol
+}
+
+func (store *apiSessionStoreImpl) onEventualDelete(name string, data []byte) {
+	var ids []string
+	err := store.stores.DbProvider.GetDb().View(func(tx *bbolt.Tx) error {
+		query := fmt.Sprintf(`%s = "%s"`, FieldSessionApiSession, string(data))
+		var err error
+		ids, _, err = store.stores.session.QueryIds(tx, query)
+		return err
+	})
+
+	if err != nil {
+		pfxlog.Logger().WithError(err).WithFields(map[string]interface{}{
+			"eventName":    name,
+			"apiSessionId": string(data),
+		}).Error("error querying for session associated to an api session during onEventualDelete")
+	}
+
+	for _, id := range ids {
+		_ = store.stores.DbProvider.GetDb().Update(func(tx *bbolt.Tx) error {
+			ctx := boltz.NewMutateContext(tx)
+			err := store.stores.session.DeleteById(ctx, id)
+
+			if err != nil {
+				pfxlog.Logger().WithError(err).WithFields(map[string]interface{}{
+					"eventName":    name,
+					"apiSessionId": string(data),
+					"sessionId":    id,
+				}).Error("error deleting for session associated to an api session during onEventualDelete")
+			}
+
+			return nil
+		})
+	}
 }
 
 func (store *apiSessionStoreImpl) Create(ctx boltz.MutateContext, entity boltz.Entity) error {
@@ -130,6 +173,20 @@ func (store *apiSessionStoreImpl) Update(ctx boltz.MutateContext, entity boltz.E
 			if (checker == nil || checker.IsUpdated(FieldApiSessionMfaComplete)) && apiSession.MfaComplete == true {
 				store.Emit(EventFullyAuthenticated, apiSession)
 			}
+		}
+	}
+
+	return err
+}
+
+func (store *apiSessionStoreImpl) DeleteById(ctx boltz.MutateContext, id string) error {
+	err := store.baseStore.DeleteById(ctx, id)
+
+	if err == nil {
+		if bboltEventualEventer, ok := store.baseStore.stores.EventualEventer.(*EventualEventerBbolt); ok {
+			bboltEventualEventer.AddEventualEventWithCtx(ctx, EventualEventApiSessionDelete, []byte(id))
+		} else {
+			store.baseStore.stores.EventualEventer.AddEventualEvent(EventualEventApiSessionDelete, []byte(id))
 		}
 	}
 

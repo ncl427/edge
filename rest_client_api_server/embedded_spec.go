@@ -1329,7 +1329,7 @@ func init() {
             "ztSession": []
           }
         ],
-        "description": "Allows an identity to extend its certificate's expiration date by using its current and valid client certificate to submit a CSR. This CSR may be passed in using a new private key, thus allowing private key rotation.\nAfter completion any new connections must be made with certificates returned from a 200 OK response. The previous client certificate is rendered invalid for use with the controller even if it has not expired.\nThis request must be made using the existing, valid, client certificate.",
+        "description": "This endpoint only functions for certificates issued by the controller. 3rd party certificates are not handled.\nAllows an identity to extend its certificate's expiration date by using its current and valid client certificate to submit a CSR. This CSR may be passed in using a new private key, thus allowing private key rotation.\nThe response from this endpoint is a new client certificate which the client must  be verified via the /authenticators/{id}/extend-verify endpoint.\nAfter verification is completion any new connections must be made with new certificate. Prior to verification the old client certificate remains active.",
         "tags": [
           "Current API Session",
           "Enroll",
@@ -1352,6 +1352,74 @@ func init() {
             "description": "A response containg the identity's new certificate",
             "schema": {
               "$ref": "#/definitions/identityExtendEnrollmentEnvelope"
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "type": "string",
+          "description": "The id of the requested resource",
+          "name": "id",
+          "in": "path",
+          "required": true
+        }
+      ]
+    },
+    "/current-identity/authenticators/{id}/extend-verify": {
+      "post": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "After submitting a CSR for a new client certificate the resulting public certificate must be re-submitted to this endpoint to verify receipt.\nAfter receipt, the new client certificate must be used for new authentication requests.",
+        "tags": [
+          "Current API Session",
+          "Enroll",
+          "Extend Enrollment"
+        ],
+        "summary": "Allows the current identity to validate reciept of a new client certificate",
+        "operationId": "extendVerifyCurrentIdentityAuthenticator",
+        "parameters": [
+          {
+            "name": "extend",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/identityExtendValidateEnrollmentRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Base empty response",
+            "schema": {
+              "$ref": "#/definitions/empty"
             }
           },
           "401": {
@@ -3720,11 +3788,15 @@ func init() {
             "authQueries",
             "cachedUpdatedAt",
             "isMfaRequired",
-            "isMfaComplete"
+            "isMfaComplete",
+            "authenticatorId"
           ],
           "properties": {
             "authQueries": {
               "$ref": "#/definitions/authQueryList"
+            },
+            "authenticatorId": {
+              "type": "string"
             },
             "cachedLastActivityAt": {
               "type": "string",
@@ -4001,11 +4073,18 @@ func init() {
         "name",
         "supportedProtocols",
         "syncStatus",
-        "isOnline"
+        "isOnline",
+        "cost",
+        "noTraversal"
       ],
       "properties": {
         "appData": {
           "$ref": "#/definitions/tags"
+        },
+        "cost": {
+          "type": "integer",
+          "maximum": 65535,
+          "x-nullable": true
         },
         "hostname": {
           "type": "string"
@@ -4015,6 +4094,10 @@ func init() {
         },
         "name": {
           "type": "string"
+        },
+        "noTraversal": {
+          "type": "boolean",
+          "x-nullable": true
         },
         "supportedProtocols": {
           "type": "object",
@@ -4293,10 +4376,10 @@ func init() {
       "type": "object",
       "required": [
         "meta",
-        "error"
+        "data"
       ],
       "properties": {
-        "error": {
+        "data": {
           "$ref": "#/definitions/detailMfa"
         },
         "meta": {
@@ -4696,6 +4779,18 @@ func init() {
       ],
       "properties": {
         "clientCertCsr": {
+          "type": "string"
+        }
+      }
+    },
+    "identityExtendValidateEnrollmentRequest": {
+      "type": "object",
+      "required": [
+        "clientCert"
+      ],
+      "properties": {
+        "clientCert": {
+          "description": "A PEM encoded client certificate previously returned after an extension request",
           "type": "string"
         }
       }
@@ -6966,7 +7061,7 @@ func init() {
             "ztSession": []
           }
         ],
-        "description": "Allows an identity to extend its certificate's expiration date by using its current and valid client certificate to submit a CSR. This CSR may be passed in using a new private key, thus allowing private key rotation.\nAfter completion any new connections must be made with certificates returned from a 200 OK response. The previous client certificate is rendered invalid for use with the controller even if it has not expired.\nThis request must be made using the existing, valid, client certificate.",
+        "description": "This endpoint only functions for certificates issued by the controller. 3rd party certificates are not handled.\nAllows an identity to extend its certificate's expiration date by using its current and valid client certificate to submit a CSR. This CSR may be passed in using a new private key, thus allowing private key rotation.\nThe response from this endpoint is a new client certificate which the client must  be verified via the /authenticators/{id}/extend-verify endpoint.\nAfter verification is completion any new connections must be made with new certificate. Prior to verification the old client certificate remains active.",
         "tags": [
           "Current API Session",
           "Enroll",
@@ -6989,6 +7084,74 @@ func init() {
             "description": "A response containg the identity's new certificate",
             "schema": {
               "$ref": "#/definitions/identityExtendEnrollmentEnvelope"
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "type": "string",
+          "description": "The id of the requested resource",
+          "name": "id",
+          "in": "path",
+          "required": true
+        }
+      ]
+    },
+    "/current-identity/authenticators/{id}/extend-verify": {
+      "post": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "After submitting a CSR for a new client certificate the resulting public certificate must be re-submitted to this endpoint to verify receipt.\nAfter receipt, the new client certificate must be used for new authentication requests.",
+        "tags": [
+          "Current API Session",
+          "Enroll",
+          "Extend Enrollment"
+        ],
+        "summary": "Allows the current identity to validate reciept of a new client certificate",
+        "operationId": "extendVerifyCurrentIdentityAuthenticator",
+        "parameters": [
+          {
+            "name": "extend",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/identityExtendValidateEnrollmentRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Base empty response",
+            "schema": {
+              "$ref": "#/definitions/empty"
             }
           },
           "401": {
@@ -9433,11 +9596,15 @@ func init() {
             "authQueries",
             "cachedUpdatedAt",
             "isMfaRequired",
-            "isMfaComplete"
+            "isMfaComplete",
+            "authenticatorId"
           ],
           "properties": {
             "authQueries": {
               "$ref": "#/definitions/authQueryList"
+            },
+            "authenticatorId": {
+              "type": "string"
             },
             "cachedLastActivityAt": {
               "type": "string",
@@ -9714,11 +9881,19 @@ func init() {
         "name",
         "supportedProtocols",
         "syncStatus",
-        "isOnline"
+        "isOnline",
+        "cost",
+        "noTraversal"
       ],
       "properties": {
         "appData": {
           "$ref": "#/definitions/tags"
+        },
+        "cost": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": 0,
+          "x-nullable": true
         },
         "hostname": {
           "type": "string"
@@ -9728,6 +9903,10 @@ func init() {
         },
         "name": {
           "type": "string"
+        },
+        "noTraversal": {
+          "type": "boolean",
+          "x-nullable": true
         },
         "supportedProtocols": {
           "type": "object",
@@ -10006,10 +10185,10 @@ func init() {
       "type": "object",
       "required": [
         "meta",
-        "error"
+        "data"
       ],
       "properties": {
-        "error": {
+        "data": {
           "$ref": "#/definitions/detailMfa"
         },
         "meta": {
@@ -10409,6 +10588,18 @@ func init() {
       ],
       "properties": {
         "clientCertCsr": {
+          "type": "string"
+        }
+      }
+    },
+    "identityExtendValidateEnrollmentRequest": {
+      "type": "object",
+      "required": [
+        "clientCert"
+      ],
+      "properties": {
+        "clientCert": {
+          "description": "A PEM encoded client certificate previously returned after an extension request",
           "type": "string"
         }
       }

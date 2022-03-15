@@ -46,6 +46,12 @@ type CommonEdgeRouterProperties struct {
 	// app data
 	AppData *Tags `json:"appData,omitempty"`
 
+	// cost
+	// Required: true
+	// Maximum: 65535
+	// Minimum: 0
+	Cost *int64 `json:"cost"`
+
 	// hostname
 	// Required: true
 	Hostname *string `json:"hostname"`
@@ -57,6 +63,10 @@ type CommonEdgeRouterProperties struct {
 	// name
 	// Required: true
 	Name *string `json:"name"`
+
+	// no traversal
+	// Required: true
+	NoTraversal *bool `json:"noTraversal"`
 
 	// supported protocols
 	// Required: true
@@ -75,6 +85,10 @@ func (m *CommonEdgeRouterProperties) Validate(formats strfmt.Registry) error {
 		res = append(res, err)
 	}
 
+	if err := m.validateCost(formats); err != nil {
+		res = append(res, err)
+	}
+
 	if err := m.validateHostname(formats); err != nil {
 		res = append(res, err)
 	}
@@ -84,6 +98,10 @@ func (m *CommonEdgeRouterProperties) Validate(formats strfmt.Registry) error {
 	}
 
 	if err := m.validateName(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateNoTraversal(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -120,6 +138,23 @@ func (m *CommonEdgeRouterProperties) validateAppData(formats strfmt.Registry) er
 	return nil
 }
 
+func (m *CommonEdgeRouterProperties) validateCost(formats strfmt.Registry) error {
+
+	if err := validate.Required("cost", "body", m.Cost); err != nil {
+		return err
+	}
+
+	if err := validate.MinimumInt("cost", "body", *m.Cost, 0, false); err != nil {
+		return err
+	}
+
+	if err := validate.MaximumInt("cost", "body", *m.Cost, 65535, false); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (m *CommonEdgeRouterProperties) validateHostname(formats strfmt.Registry) error {
 
 	if err := validate.Required("hostname", "body", m.Hostname); err != nil {
@@ -141,6 +176,15 @@ func (m *CommonEdgeRouterProperties) validateIsOnline(formats strfmt.Registry) e
 func (m *CommonEdgeRouterProperties) validateName(formats strfmt.Registry) error {
 
 	if err := validate.Required("name", "body", m.Name); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *CommonEdgeRouterProperties) validateNoTraversal(formats strfmt.Registry) error {
+
+	if err := validate.Required("noTraversal", "body", m.NoTraversal); err != nil {
 		return err
 	}
 

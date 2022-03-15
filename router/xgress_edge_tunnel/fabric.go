@@ -22,12 +22,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/michaelquigley/pfxlog"
 	"github.com/netfoundry/secretstream/kx"
+	"github.com/openziti/channel"
+	"github.com/openziti/channel/protobufs"
 	"github.com/openziti/edge/pb/edge_ctrl_pb"
 	"github.com/openziti/edge/router/xgress_common"
 	"github.com/openziti/edge/tunnel"
 	"github.com/openziti/fabric/build"
 	"github.com/openziti/fabric/router/xgress"
-	"github.com/openziti/foundation/channel2"
 	"github.com/openziti/foundation/identity/identity"
 	"github.com/openziti/foundation/util/concurrenz"
 	"github.com/openziti/sdk-golang/ziti/edge"
@@ -156,7 +157,7 @@ func (self *fabricProvider) authenticate() error {
 		},
 	}
 
-	respMsg, err := self.factory.Channel().SendForReply(request, 30*time.Second)
+	respMsg, err := protobufs.MarshalTyped(request).WithTimeout(30 * time.Second).SendForReply(self.factory.Channel())
 
 	resp := &edge_ctrl_pb.CreateApiSessionResponse{}
 	if err = xgress_common.GetResultOrFailure(respMsg, err, resp); err != nil {
@@ -196,7 +197,7 @@ func (self *fabricProvider) TunnelService(service tunnel.Service, terminatorIden
 		PeerData:           peerData,
 	}
 
-	responseMsg, err := self.factory.Channel().SendForReply(request, service.GetDialTimeout())
+	responseMsg, err := protobufs.MarshalTyped(request).WithTimeout(service.GetDialTimeout()).SendForReply(self.factory.Channel())
 
 	response := &edge_ctrl_pb.CreateCircuitForServiceResponse{}
 	if err = xgress_common.GetResultOrFailure(responseMsg, err, response); err != nil {
@@ -205,10 +206,12 @@ func (self *fabricProvider) TunnelService(service tunnel.Service, terminatorIden
 	}
 
 	if response.ApiSession != nil {
+		log.WithField("apiSessionId", response.ApiSession.SessionId).Info("received new apiSession")
 		self.updateApiSession(response.ApiSession)
 	}
 
 	if response.Session != nil && response.Session.SessionId != sessionId {
+		log.WithField("sessionId", response.Session.SessionId).Info("received new session")
 		self.dialSessions.Set(service.GetName(), response.Session.SessionId)
 	}
 
@@ -246,15 +249,15 @@ func (self *fabricProvider) HostService(hostCtx tunnel.HostingContext) (tunnel.H
 }
 
 func (self *fabricProvider) establishTerminatorWithRetry(terminator *tunnelTerminator) {
-	logger := logrus.WithField("service", terminator.context.ServiceName())
+	log := logrus.WithField("service", terminator.context.ServiceName())
 
 	if terminator.closed.Get() {
-		logger.Info("not attempting to establish terminator, service not hostable")
+		log.Info("not attempting to establish terminator, service not hostable")
 		return
 	}
 
 	operation := func() error {
-		logger.Info("attempting to establish terminator")
+		log.Info("attempting to establish terminator")
 		err := self.establishTerminator(terminator)
 		if err != nil && terminator.closed.Get() {
 			return backoff.Permanent(err)
@@ -266,14 +269,14 @@ func (self *fabricProvider) establishTerminatorWithRetry(terminator *tunnelTermi
 	expBackoff.MaxInterval = 1 * time.Minute
 
 	if err := backoff.Retry(operation, expBackoff); err != nil {
-		logger.WithError(err).Error("stopping attempts to establish terminator, service not hostable")
+		log.WithError(err).Error("stopping attempts to establish terminator, service not hostable")
 	}
 }
 
 func (self *fabricProvider) establishTerminator(terminator *tunnelTerminator) error {
 	terminator.address = uuid.NewString() // grab new id each time we retry
 
-	logger := pfxlog.Logger().
+	log := pfxlog.Logger().
 		WithField("routerId", self.factory.id).
 		WithField("service", terminator.context.ServiceName()).
 		WithField("address", terminator.address)
@@ -309,36 +312,38 @@ func (self *fabricProvider) establishTerminator(terminator *tunnelTerminator) er
 	request.GetContentType()
 
 	response := &edge_ctrl_pb.CreateTunnelTerminatorResponse{}
-	responseMsg, err := self.factory.Channel().SendForReply(request, self.factory.DefaultRequestTimeout())
+	responseMsg, err := protobufs.MarshalTyped(request).WithTimeout(self.factory.DefaultRequestTimeout()).SendForReply(self.factory.Channel())
 	if err = xgress_common.GetResultOrFailure(responseMsg, err, response); err != nil {
-		logger.WithError(err).Error("error creating terminator")
+		log.WithError(err).Error("error creating terminator")
 		return err
 	}
 
 	if response.ApiSession != nil {
+		log.WithField("apiSessionId", response.ApiSession.SessionId).Info("received new api-session")
 		self.updateApiSession(response.ApiSession)
 	}
 
 	if response.Session != nil && response.Session.SessionId != sessionId {
+		log.WithField("sessionId", response.Session.SessionId).Info("received new session")
 		self.bindSessions.Set(terminator.context.ServiceName(), response.Session.SessionId)
 	}
 
 	terminator.closeCallback = self.tunneler.stateManager.AddEdgeSessionRemovedListener(response.Session.Token, func(token string) {
 		if err := self.removeTerminator(terminator); err != nil {
-			logger.WithError(err).Error("failed to remove terminator after edge session was removed")
+			log.WithError(err).Error("failed to remove terminator after edge session was removed")
 		}
 		go self.establishTerminatorWithRetry(terminator)
 	})
 
-	logger.WithField("terminatorId", response.TerminatorId).Info("created terminator")
+	log.WithField("terminatorId", response.TerminatorId).Info("created terminator")
 
 	terminator.terminatorId = response.TerminatorId
 	return nil
 }
 
 func (self *fabricProvider) removeTerminator(terminator *tunnelTerminator) error {
-	msg := channel2.NewMessage(int32(edge_ctrl_pb.ContentType_RemoveTunnelTerminatorRequestType), []byte(terminator.terminatorId))
-	responseMsg, err := self.factory.Channel().SendAndWaitWithTimeout(msg, self.factory.DefaultRequestTimeout())
+	msg := channel.NewMessage(int32(edge_ctrl_pb.ContentType_RemoveTunnelTerminatorRequestType), []byte(terminator.terminatorId))
+	responseMsg, err := msg.WithTimeout(self.factory.DefaultRequestTimeout()).SendForReply(self.factory.Channel())
 	return xgress_common.CheckForFailureResult(responseMsg, err, edge_ctrl_pb.ContentType_RemoveTunnelTerminatorResponseType)
 }
 
@@ -362,26 +367,26 @@ func (self *fabricProvider) updateTerminator(terminatorId string, cost *uint16, 
 		}
 	}
 
-	logger := logrus.WithField("terminator", terminatorId).
+	log := logrus.WithField("terminator", terminatorId).
 		WithField("precedence", request.Precedence).
 		WithField("cost", request.Cost).
 		WithField("updatingPrecedence", request.UpdatePrecedence).
 		WithField("updatingCost", request.UpdateCost)
 
-	logger.Debug("updating terminator")
+	log.Debug("updating terminator")
 
-	responseMsg, err := self.factory.Channel().SendForReply(request, self.factory.DefaultRequestTimeout())
+	responseMsg, err := protobufs.MarshalTyped(request).WithTimeout(self.factory.DefaultRequestTimeout()).SendForReply(self.factory.Channel())
 	if err := xgress_common.CheckForFailureResult(responseMsg, err, edge_ctrl_pb.ContentType_UpdateTunnelTerminatorResponseType); err != nil {
-		logger.WithError(err).Error("terminator update failed")
+		log.WithError(err).Error("terminator update failed")
 		return err
 	}
 
-	logger.Debug("terminator updated successfully")
+	log.Debug("terminator updated successfully")
 	return nil
 }
 
 func (self *fabricProvider) sendHealthEvent(terminatorId string, checkPassed bool) error {
-	msg := channel2.NewMessage(int32(edge_ctrl_pb.ContentType_TunnelHealthEventType), nil)
+	msg := channel.NewMessage(int32(edge_ctrl_pb.ContentType_TunnelHealthEventType), nil)
 	msg.Headers[int32(edge_ctrl_pb.Header_TerminatorId)] = []byte(terminatorId)
 	msg.PutBoolHeader(int32(edge_ctrl_pb.Header_CheckPassed), checkPassed)
 
@@ -399,7 +404,7 @@ func (self *fabricProvider) sendHealthEvent(terminatorId string, checkPassed boo
 }
 
 func (self *fabricProvider) requestServiceList(lastUpdateToken []byte) {
-	msg := channel2.NewMessage(int32(edge_ctrl_pb.ContentType_ListServicesRequestType), lastUpdateToken)
+	msg := channel.NewMessage(int32(edge_ctrl_pb.ContentType_ListServicesRequestType), lastUpdateToken)
 	if err := self.factory.Channel().Send(msg); err != nil {
 		logrus.WithError(err).Error("failed to send service list request to controller")
 	}

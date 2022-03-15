@@ -18,6 +18,9 @@ package routes
 
 import (
 	"fmt"
+
+	"strings"
+
 	"github.com/go-openapi/strfmt"
 	"github.com/michaelquigley/pfxlog"
 	"github.com/openziti/edge/controller/env"
@@ -27,7 +30,6 @@ import (
 	"github.com/openziti/fabric/controller/models"
 	"github.com/openziti/foundation/common"
 	"github.com/openziti/foundation/util/stringz"
-	"strings"
 )
 
 const (
@@ -61,6 +63,8 @@ func MapCreateEdgeRouterToModel(router *rest_model.EdgeRouterCreate) *model.Edge
 		RoleAttributes:    AttributesOrDefault(router.RoleAttributes),
 		IsTunnelerEnabled: router.IsTunnelerEnabled,
 		AppData:           TagsOrDefault(router.AppData),
+		Cost:              uint16(Int64OrDefault(router.Cost)),
+		NoTraversal:       BoolOrDefault(router.NoTraversal),
 	}
 
 	return ret
@@ -76,6 +80,8 @@ func MapUpdateEdgeRouterToModel(id string, router *rest_model.EdgeRouterUpdate) 
 		RoleAttributes:    AttributesOrDefault(router.RoleAttributes),
 		IsTunnelerEnabled: router.IsTunnelerEnabled,
 		AppData:           TagsOrDefault(router.AppData),
+		Cost:              uint16(Int64OrDefault(router.Cost)),
+		NoTraversal:       BoolOrDefault(router.NoTraversal),
 	}
 
 	return ret
@@ -91,6 +97,8 @@ func MapPatchEdgeRouterToModel(id string, router *rest_model.EdgeRouterPatch) *m
 		RoleAttributes:    AttributesOrDefault(router.RoleAttributes),
 		IsTunnelerEnabled: router.IsTunnelerEnabled,
 		AppData:           TagsOrDefault(router.AppData),
+		Cost:              uint16(Int64OrDefault(router.Cost)),
+		NoTraversal:       BoolOrDefault(router.NoTraversal),
 	}
 
 	return ret
@@ -143,6 +151,7 @@ func MapEdgeRouterToRestModel(ae *env.AppEnv, router *model.EdgeRouter) (*rest_m
 		appData.SubTags = map[string]interface{}{}
 	}
 
+	cost := int64(router.Cost)
 	ret := &rest_model.EdgeRouterDetail{
 		BaseEntity: BaseEntityToRestModel(router, EdgeRouterLinkFactory),
 		CommonEdgeRouterProperties: rest_model.CommonEdgeRouterProperties{
@@ -152,20 +161,21 @@ func MapEdgeRouterToRestModel(ae *env.AppEnv, router *model.EdgeRouter) (*rest_m
 			SupportedProtocols: routerState.Protocols,
 			SyncStatus:         &syncStatusStr,
 			AppData:            &appData,
+			Cost:               &cost,
+			NoTraversal:        &router.NoTraversal,
 		},
-		RoleAttributes:      &roleAttributes,
-		EnrollmentToken:     nil,
-		EnrollmentCreatedAt: nil,
-		EnrollmentExpiresAt: nil,
-		EnrollmentJwt:       nil,
-		IsVerified:          &router.IsVerified,
-		Fingerprint:         stringz.OrEmpty(router.Fingerprint),
-		VersionInfo:         MapVersionInfoToRestModel(routerState.VersionInfo),
-		IsTunnelerEnabled:   &router.IsTunnelerEnabled,
-		CertPem: router.CertPem,
+		RoleAttributes:        &roleAttributes,
+		EnrollmentToken:       nil,
+		EnrollmentCreatedAt:   nil,
+		EnrollmentExpiresAt:   nil,
+		EnrollmentJwt:         nil,
+		IsVerified:            &router.IsVerified,
+		Fingerprint:           stringz.OrEmpty(router.Fingerprint),
+		VersionInfo:           MapVersionInfoToRestModel(routerState.VersionInfo),
+		IsTunnelerEnabled:     &router.IsTunnelerEnabled,
+		CertPem:               router.CertPem,
 		UnverifiedFingerprint: router.UnverifiedFingerprint,
-		UnverifiedCertPem: router.UnverifiedCertPem,
-
+		UnverifiedCertPem:     router.UnverifiedCertPem,
 	}
 
 	if !router.IsVerified {
@@ -180,18 +190,17 @@ func MapEdgeRouterToRestModel(ae *env.AppEnv, router *model.EdgeRouter) (*rest_m
 			return nil, err
 		}
 
-		if len(enrollments) != 1 {
-			return nil, fmt.Errorf("expected enrollment not found for unverified edge router %s", router.Id)
+		if len(enrollments) > 0 {
+			enrollment := enrollments[0]
+
+			createdAt := strfmt.DateTime(enrollment.CreatedAt)
+			expiresAt := strfmt.DateTime(*enrollment.ExpiresAt)
+
+			ret.EnrollmentExpiresAt = &expiresAt
+			ret.EnrollmentCreatedAt = &createdAt
+			ret.EnrollmentJwt = &enrollment.Jwt
+			ret.EnrollmentToken = &enrollment.Token
 		}
-		enrollment := enrollments[0]
-
-		createdAt := strfmt.DateTime(enrollment.CreatedAt)
-		expiresAt := strfmt.DateTime(*enrollment.ExpiresAt)
-
-		ret.EnrollmentExpiresAt = &expiresAt
-		ret.EnrollmentCreatedAt = &createdAt
-		ret.EnrollmentJwt = &enrollment.Jwt
-		ret.EnrollmentToken = &enrollment.Token
 	}
 
 	return ret, nil

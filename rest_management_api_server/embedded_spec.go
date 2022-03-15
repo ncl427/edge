@@ -3843,7 +3843,7 @@ func init() {
             "ztSession": []
           }
         ],
-        "description": "Allows an identity to extend its certificate's expiration date by using its current and valid client certificate to submit a CSR. This CSR may be passed in using a new private key, thus allowing private key rotation.\nAfter completion any new connections must be made with certificates returned from a 200 OK response. The previous client certificate is rendered invalid for use with the controller even if it has not expired.\nThis request must be made using the existing, valid, client certificate.",
+        "description": "This endpoint only functions for certificates issued by the controller. 3rd party certificates are not handled.\nAllows an identity to extend its certificate's expiration date by using its current and valid client certificate to submit a CSR. This CSR may be passed in using a new private key, thus allowing private key rotation.\nThe response from this endpoint is a new client certificate which the client must  be verified via the /authenticators/{id}/extend-verify endpoint.\nAfter verification is completion any new connections must be made with new certificate. Prior to verification the old client certificate remains active.",
         "tags": [
           "Current API Session",
           "Enroll",
@@ -3866,6 +3866,74 @@ func init() {
             "description": "A response containg the identity's new certificate",
             "schema": {
               "$ref": "#/definitions/identityExtendEnrollmentEnvelope"
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "type": "string",
+          "description": "The id of the requested resource",
+          "name": "id",
+          "in": "path",
+          "required": true
+        }
+      ]
+    },
+    "/current-identity/authenticators/{id}/extend-verify": {
+      "post": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "After submitting a CSR for a new client certificate the resulting public certificate must be re-submitted to this endpoint to verify receipt.\nAfter receipt, the new client certificate must be used for new authentication requests.",
+        "tags": [
+          "Current API Session",
+          "Enroll",
+          "Extend Enrollment"
+        ],
+        "summary": "Allows the current identity to validate reciept of a new client certificate",
+        "operationId": "extendVerifyCurrentIdentityAuthenticator",
+        "parameters": [
+          {
+            "name": "extend",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/identityExtendValidateEnrollmentRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Base empty response",
+            "schema": {
+              "$ref": "#/definitions/empty"
             }
           },
           "401": {
@@ -6851,6 +6919,706 @@ func init() {
                   "code": "UNAUTHORIZED",
                   "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
                   "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "type": "string",
+          "description": "The id of the requested resource",
+          "name": "id",
+          "in": "path",
+          "required": true
+        }
+      ]
+    },
+    "/enrollments/{id}/refresh": {
+      "post": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "For expired or unexpired enrollments, reset the expiration window. A new JWT will be generated and must be used for the enrollment. If the ` + "`" + `validFrom` + "`" + ` value is not provided it will default to now. If the ` + "`" + `validTo` + "`" + ` value is not provided it will default to ` + "`" + `validFrom` + "`" + `  the controller's configured enrollment timeout.",
+        "tags": [
+          "Enrollment"
+        ],
+        "summary": "Refreshes an enrollment record's expiration window",
+        "operationId": "refreshEnrollment",
+        "parameters": [
+          {
+            "description": "An enrollment refresh request",
+            "name": "refresh",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/enrollmentRefresh"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The create request was successful and the resource has been added at the following location",
+            "schema": {
+              "$ref": "#/definitions/createEnvelope"
+            }
+          },
+          "400": {
+            "description": "The supplied request contains invalid fields or could not be parsed (json and non-json bodies). The error's code, message, and cause fields can be inspected for further information",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": {
+                    "details": {
+                      "context": "(root)",
+                      "field": "(root)",
+                      "property": "fooField3"
+                    },
+                    "field": "(root)",
+                    "message": "(root): fooField3 is required",
+                    "type": "required",
+                    "value": {
+                      "fooField": "abc",
+                      "fooField2": "def"
+                    }
+                  },
+                  "causeMessage": "schema validation failed",
+                  "code": "COULD_NOT_VALIDATE",
+                  "message": "The supplied request contains an invalid document",
+                  "requestId": "ac6766d6-3a09-44b3-8d8a-1b541d97fdd9"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "type": "string",
+          "description": "The id of the requested resource",
+          "name": "id",
+          "in": "path",
+          "required": true
+        }
+      ]
+    },
+    "/external-jwt-signers": {
+      "get": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "Retrieves a list of external JWT signers for authentication",
+        "tags": [
+          "External JWT Signer"
+        ],
+        "summary": "List External JWT Signers",
+        "operationId": "listExternalJwtSigners",
+        "parameters": [
+          {
+            "type": "integer",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "filter",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of External JWT Signers",
+            "schema": {
+              "$ref": "#/definitions/listExternalJwtSignersEnvelope"
+            }
+          },
+          "400": {
+            "description": "The supplied request contains invalid fields or could not be parsed (json and non-json bodies). The error's code, message, and cause fields can be inspected for further information",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": {
+                    "details": {
+                      "context": "(root)",
+                      "field": "(root)",
+                      "property": "fooField3"
+                    },
+                    "field": "(root)",
+                    "message": "(root): fooField3 is required",
+                    "type": "required",
+                    "value": {
+                      "fooField": "abc",
+                      "fooField2": "def"
+                    }
+                  },
+                  "causeMessage": "schema validation failed",
+                  "code": "COULD_NOT_VALIDATE",
+                  "message": "The supplied request contains an invalid document",
+                  "requestId": "ac6766d6-3a09-44b3-8d8a-1b541d97fdd9"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "Creates an External JWT Signer. Requires admin access.",
+        "tags": [
+          "External JWT Signer"
+        ],
+        "summary": "Creates an External JWT Signer",
+        "operationId": "createExternalJwtSigner",
+        "parameters": [
+          {
+            "description": "An External JWT Signer to create",
+            "name": "externalJwtSigner",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/externalJwtSignerCreate"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The create request was successful and the resource has been added at the following location",
+            "schema": {
+              "$ref": "#/definitions/createEnvelope"
+            }
+          },
+          "400": {
+            "description": "The supplied request contains invalid fields or could not be parsed (json and non-json bodies). The error's code, message, and cause fields can be inspected for further information",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": {
+                    "details": {
+                      "context": "(root)",
+                      "field": "(root)",
+                      "property": "fooField3"
+                    },
+                    "field": "(root)",
+                    "message": "(root): fooField3 is required",
+                    "type": "required",
+                    "value": {
+                      "fooField": "abc",
+                      "fooField2": "def"
+                    }
+                  },
+                  "causeMessage": "schema validation failed",
+                  "code": "COULD_NOT_VALIDATE",
+                  "message": "The supplied request contains an invalid document",
+                  "requestId": "ac6766d6-3a09-44b3-8d8a-1b541d97fdd9"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/external-jwt-signers/{id}": {
+      "get": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "Retrieves a single External JWT Signer by id. Requires admin access.",
+        "tags": [
+          "External JWT Signer"
+        ],
+        "summary": "Retrieves a single External JWT Signer",
+        "operationId": "detailExternalJwtSigner",
+        "responses": {
+          "200": {
+            "description": "A singular External JWT Signer resource",
+            "schema": {
+              "$ref": "#/definitions/detailExternalJwtSignerEnvelope"
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {
+                      "id": "71a3000f-7dda-491a-9b90-a19f4ee6c406"
+                    }
+                  },
+                  "cause": null,
+                  "causeMessage": "",
+                  "code": "NOT_FOUND",
+                  "message": "The resource requested was not found or is no longer available",
+                  "requestId": "270908d6-f2ef-4577-b973-67bec18ae376"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "Update all fields on an External JWT Signer by id. Requires admin access.",
+        "tags": [
+          "External JWT Signer"
+        ],
+        "summary": "Update all fields on an External JWT Signer",
+        "operationId": "updateExternalJwtSigner",
+        "parameters": [
+          {
+            "description": "An External JWT Signer update object",
+            "name": "externalJwtSigner",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/externalJwtSignerUpdate"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The update request was successful and the resource has been altered",
+            "schema": {
+              "$ref": "#/definitions/empty"
+            }
+          },
+          "400": {
+            "description": "The supplied request contains invalid fields or could not be parsed (json and non-json bodies). The error's code, message, and cause fields can be inspected for further information",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": {
+                    "details": {
+                      "context": "(root)",
+                      "field": "(root)",
+                      "property": "fooField3"
+                    },
+                    "field": "(root)",
+                    "message": "(root): fooField3 is required",
+                    "type": "required",
+                    "value": {
+                      "fooField": "abc",
+                      "fooField2": "def"
+                    }
+                  },
+                  "causeMessage": "schema validation failed",
+                  "code": "COULD_NOT_VALIDATE",
+                  "message": "The supplied request contains an invalid document",
+                  "requestId": "ac6766d6-3a09-44b3-8d8a-1b541d97fdd9"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {
+                      "id": "71a3000f-7dda-491a-9b90-a19f4ee6c406"
+                    }
+                  },
+                  "cause": null,
+                  "causeMessage": "",
+                  "code": "NOT_FOUND",
+                  "message": "The resource requested was not found or is no longer available",
+                  "requestId": "270908d6-f2ef-4577-b973-67bec18ae376"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "Delete an External JWT Signer by id. Requires admin access.\n",
+        "tags": [
+          "External JWT Signer"
+        ],
+        "summary": "Delete an External JWT Signer",
+        "operationId": "deleteExternalJwtSigner",
+        "responses": {
+          "200": {
+            "description": "The delete request was successful and the resource has been removed",
+            "schema": {
+              "$ref": "#/definitions/empty"
+            }
+          },
+          "400": {
+            "description": "The supplied request contains invalid fields or could not be parsed (json and non-json bodies). The error's code, message, and cause fields can be inspected for further information",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": {
+                    "details": {
+                      "context": "(root)",
+                      "field": "(root)",
+                      "property": "fooField3"
+                    },
+                    "field": "(root)",
+                    "message": "(root): fooField3 is required",
+                    "type": "required",
+                    "value": {
+                      "fooField": "abc",
+                      "fooField2": "def"
+                    }
+                  },
+                  "causeMessage": "schema validation failed",
+                  "code": "COULD_NOT_VALIDATE",
+                  "message": "The supplied request contains an invalid document",
+                  "requestId": "ac6766d6-3a09-44b3-8d8a-1b541d97fdd9"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "Update only the supplied fields on an External JWT Signer by id. Requires admin access.",
+        "tags": [
+          "External JWT Signer"
+        ],
+        "summary": "Update the supplied fields on an External JWT Signer",
+        "operationId": "patchExternalJwtSigner",
+        "parameters": [
+          {
+            "description": "An External JWT Signer patch object",
+            "name": "externalJwtSigner",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/externalJwtSignerPatch"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The patch request was successful and the resource has been altered",
+            "schema": {
+              "$ref": "#/definitions/empty"
+            }
+          },
+          "400": {
+            "description": "The supplied request contains invalid fields or could not be parsed (json and non-json bodies). The error's code, message, and cause fields can be inspected for further information",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": {
+                    "details": {
+                      "context": "(root)",
+                      "field": "(root)",
+                      "property": "fooField3"
+                    },
+                    "field": "(root)",
+                    "message": "(root): fooField3 is required",
+                    "type": "required",
+                    "value": {
+                      "fooField": "abc",
+                      "fooField2": "def"
+                    }
+                  },
+                  "causeMessage": "schema validation failed",
+                  "code": "COULD_NOT_VALIDATE",
+                  "message": "The supplied request contains an invalid document",
+                  "requestId": "ac6766d6-3a09-44b3-8d8a-1b541d97fdd9"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {
+                      "id": "71a3000f-7dda-491a-9b90-a19f4ee6c406"
+                    }
+                  },
+                  "cause": null,
+                  "causeMessage": "",
+                  "code": "NOT_FOUND",
+                  "message": "The resource requested was not found or is no longer available",
+                  "requestId": "270908d6-f2ef-4577-b973-67bec18ae376"
                 },
                 "meta": {
                   "apiEnrollmentVersion": "0.0.1",
@@ -15349,11 +16117,15 @@ func init() {
             "authQueries",
             "cachedUpdatedAt",
             "isMfaRequired",
-            "isMfaComplete"
+            "isMfaComplete",
+            "authenticatorId"
           ],
           "properties": {
             "authQueries": {
               "$ref": "#/definitions/authQueryList"
+            },
+            "authenticatorId": {
+              "type": "string"
             },
             "cachedLastActivityAt": {
               "type": "string",
@@ -15869,11 +16641,18 @@ func init() {
         "name",
         "supportedProtocols",
         "syncStatus",
-        "isOnline"
+        "isOnline",
+        "cost",
+        "noTraversal"
       ],
       "properties": {
         "appData": {
           "$ref": "#/definitions/tags"
+        },
+        "cost": {
+          "type": "integer",
+          "maximum": 65535,
+          "x-nullable": true
         },
         "hostname": {
           "type": "string"
@@ -15883,6 +16662,10 @@ func init() {
         },
         "name": {
           "type": "string"
+        },
+        "noTraversal": {
+          "type": "boolean",
+          "x-nullable": true
         },
         "supportedProtocols": {
           "type": "object",
@@ -16382,6 +17165,21 @@ func init() {
         }
       }
     },
+    "detailExternalJwtSignerEnvelope": {
+      "type": "object",
+      "required": [
+        "meta",
+        "data"
+      ],
+      "properties": {
+        "data": {
+          "$ref": "#/definitions/externalJwtSignerDetail"
+        },
+        "meta": {
+          "$ref": "#/definitions/meta"
+        }
+      }
+    },
     "detailIdentityEnvelope": {
       "type": "object",
       "required": [
@@ -16445,10 +17243,10 @@ func init() {
       "type": "object",
       "required": [
         "meta",
-        "error"
+        "data"
       ],
       "properties": {
-        "error": {
+        "data": {
           "$ref": "#/definitions/detailMfa"
         },
         "meta": {
@@ -16695,11 +17493,20 @@ func init() {
         "appData": {
           "$ref": "#/definitions/tags"
         },
+        "cost": {
+          "type": "integer",
+          "maximum": 65535,
+          "x-nullable": true
+        },
         "isTunnelerEnabled": {
           "type": "boolean"
         },
         "name": {
           "type": "string"
+        },
+        "noTraversal": {
+          "type": "boolean",
+          "x-nullable": true
         },
         "roleAttributes": {
           "$ref": "#/definitions/attributes"
@@ -16792,6 +17599,7 @@ func init() {
             "href": "./edge-routers/b0766b8d-bd1a-4d28-8415-639b29d3c83d"
           }
         },
+        "cost": 0,
         "createdAt": "2020-03-16T17:13:31.5807454Z",
         "enrollmentCreatedAt": "2020-03-16T17:13:31.5777637Z",
         "enrollmentExpiresAt": "2020-03-16T17:18:31.5777637Z",
@@ -16804,6 +17612,7 @@ func init() {
         "isTunnelerEnabled": false,
         "isVerified": false,
         "name": "TestRouter-e33c837f-3222-4b40-bcd6-b3458fd5156e",
+        "noTraversal": false,
         "roleAttributes": [
           "eastCoast",
           "sales",
@@ -16828,11 +17637,20 @@ func init() {
         "appData": {
           "$ref": "#/definitions/tags"
         },
+        "cost": {
+          "type": "integer",
+          "maximum": 65535,
+          "x-nullable": true
+        },
         "isTunnelerEnabled": {
           "type": "boolean"
         },
         "name": {
           "type": "string"
+        },
+        "noTraversal": {
+          "type": "boolean",
+          "x-nullable": true
         },
         "roleAttributes": {
           "$ref": "#/definitions/attributes"
@@ -16966,11 +17784,20 @@ func init() {
         "appData": {
           "$ref": "#/definitions/tags"
         },
+        "cost": {
+          "type": "integer",
+          "maximum": 65535,
+          "x-nullable": true
+        },
         "isTunnelerEnabled": {
           "type": "boolean"
         },
         "name": {
           "type": "string"
+        },
+        "noTraversal": {
+          "type": "boolean",
+          "x-nullable": true
         },
         "roleAttributes": {
           "$ref": "#/definitions/attributes"
@@ -17086,6 +17913,19 @@ func init() {
         "$ref": "#/definitions/enrollmentDetail"
       }
     },
+    "enrollmentRefresh": {
+      "type": "object",
+      "properties": {
+        "validFrom": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "validTo": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
     "entityRef": {
       "description": "A reference to another resource and links to interact with it",
       "type": "object",
@@ -17119,6 +17959,128 @@ func init() {
         },
         "osVersion": {
           "type": "string"
+        }
+      }
+    },
+    "externalJwtSignerCreate": {
+      "description": "A create Certificate Authority (CA) object",
+      "type": "object",
+      "required": [
+        "name",
+        "certPem",
+        "enabled"
+      ],
+      "properties": {
+        "certPem": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string",
+          "example": "MyApps Signer"
+        },
+        "tags": {
+          "$ref": "#/definitions/tags"
+        }
+      }
+    },
+    "externalJwtSignerDetail": {
+      "description": "A External JWT Signer resource",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/baseEntity"
+        },
+        {
+          "type": "object",
+          "required": [
+            "name",
+            "certPem",
+            "enabled",
+            "fingerprint",
+            "commonName",
+            "notAfter",
+            "notBefore"
+          ],
+          "properties": {
+            "certPem": {
+              "type": "string"
+            },
+            "commonName": {
+              "type": "string"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "fingerprint": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string",
+              "example": "MyApps Signer"
+            },
+            "notAfter": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "notBefore": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      ]
+    },
+    "externalJwtSignerList": {
+      "description": "An array of External JWT Signers resources",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/externalJwtSignerDetail"
+      }
+    },
+    "externalJwtSignerPatch": {
+      "type": "object",
+      "properties": {
+        "certPem": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "enabled": {
+          "type": "boolean",
+          "x-nullable": true
+        },
+        "name": {
+          "type": "string",
+          "x-nullable": true,
+          "example": "MyApps Signer"
+        },
+        "tags": {
+          "$ref": "#/definitions/tags"
+        }
+      }
+    },
+    "externalJwtSignerUpdate": {
+      "type": "object",
+      "required": [
+        "name",
+        "certPem",
+        "enabled"
+      ],
+      "properties": {
+        "certPem": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string",
+          "example": "MyApps Signer"
+        },
+        "tags": {
+          "$ref": "#/definitions/tags"
         }
       }
     },
@@ -17447,6 +18409,18 @@ func init() {
         }
       }
     },
+    "identityExtendValidateEnrollmentRequest": {
+      "type": "object",
+      "required": [
+        "clientCert"
+      ],
+      "properties": {
+        "clientCert": {
+          "description": "A PEM encoded client certificate previously returned after an extension request",
+          "type": "string"
+        }
+      }
+    },
     "identityList": {
       "description": "A list of identities",
       "type": "array",
@@ -17696,6 +18670,21 @@ func init() {
       "properties": {
         "data": {
           "$ref": "#/definitions/enrollmentList"
+        },
+        "meta": {
+          "$ref": "#/definitions/meta"
+        }
+      }
+    },
+    "listExternalJwtSignersEnvelope": {
+      "type": "object",
+      "required": [
+        "meta",
+        "data"
+      ],
+      "properties": {
+        "data": {
+          "$ref": "#/definitions/externalJwtSignerList"
         },
         "meta": {
           "$ref": "#/definitions/meta"
@@ -18357,11 +19346,15 @@ func init() {
           "type": "object",
           "required": [
             "actualValue",
-            "expectedValue"
+            "expectedValue",
+            "criteria"
           ],
           "properties": {
             "actualValue": {
               "$ref": "#/definitions/postureChecksFailureMfaValues"
+            },
+            "criteria": {
+              "$ref": "#/definitions/postureChecksFailureMfaCriteria"
             },
             "expectedValue": {
               "$ref": "#/definitions/postureChecksFailureMfaValues"
@@ -19021,20 +20014,54 @@ func init() {
       },
       "discriminator": "typeId"
     },
+    "postureChecksFailureMfaCriteria": {
+      "type": "object",
+      "required": [
+        "passedMfaAt",
+        "wokenAt",
+        "unlockedAt",
+        "timeoutSeconds",
+        "timeoutRemainingSeconds"
+      ],
+      "properties": {
+        "passedMfaAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "timeoutRemainingSeconds": {
+          "type": "integer"
+        },
+        "timeoutSeconds": {
+          "type": "integer"
+        },
+        "unlockedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "wokenAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
     "postureChecksFailureMfaValues": {
       "type": "object",
       "properties": {
         "passedMfa": {
-          "type": "boolean"
+          "type": "boolean",
+          "x-omitempty": false
         },
         "passedOnUnlock": {
-          "type": "boolean"
+          "type": "boolean",
+          "x-omitempty": false
         },
         "passedOnWake": {
-          "type": "boolean"
+          "type": "boolean",
+          "x-omitempty": false
         },
         "timedOut": {
-          "type": "boolean"
+          "type": "boolean",
+          "x-omitempty": false
         }
       }
     },
@@ -19170,20 +20197,29 @@ func init() {
         "apiSessionId",
         "passedMfa",
         "passedOnWake",
-        "passedOnUnlock"
+        "passedOnUnlock",
+        "passedAt"
       ],
       "properties": {
         "apiSessionId": {
           "type": "string"
         },
+        "passedAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-omitempty": false
+        },
         "passedMfa": {
-          "type": "boolean"
+          "type": "boolean",
+          "x-omitempty": false
         },
         "passedOnUnlock": {
-          "type": "boolean"
+          "type": "boolean",
+          "x-omitempty": false
         },
         "passedOnWake": {
-          "type": "boolean"
+          "type": "boolean",
+          "x-omitempty": false
         }
       }
     },
@@ -19386,8 +20422,17 @@ func init() {
         "name"
       ],
       "properties": {
+        "cost": {
+          "type": "integer",
+          "maximum": 65535,
+          "x-nullable": true
+        },
         "name": {
           "type": "string"
+        },
+        "noTraversal": {
+          "type": "boolean",
+          "x-nullable": true
         },
         "tags": {
           "$ref": "#/definitions/tags"
@@ -19406,9 +20451,15 @@ func init() {
             "name",
             "isVerified",
             "isOnline",
-            "fingerprint"
+            "fingerprint",
+            "cost",
+            "noTraversal"
           ],
           "properties": {
+            "cost": {
+              "type": "integer",
+              "maximum": 65535
+            },
             "enrollmentCreatedAt": {
               "type": "string",
               "format": "date-time",
@@ -19438,6 +20489,9 @@ func init() {
             },
             "name": {
               "type": "string"
+            },
+            "noTraversal": {
+              "type": "boolean"
             },
             "unverifiedCertPem": {
               "type": "string",
@@ -19481,8 +20535,17 @@ func init() {
     "routerPatch": {
       "type": "object",
       "properties": {
+        "cost": {
+          "type": "integer",
+          "maximum": 65535,
+          "x-nullable": true
+        },
         "name": {
           "type": "string"
+        },
+        "noTraversal": {
+          "type": "boolean",
+          "x-nullable": true
         },
         "tags": {
           "$ref": "#/definitions/tags"
@@ -19495,8 +20558,17 @@ func init() {
         "name"
       ],
       "properties": {
+        "cost": {
+          "type": "integer",
+          "maximum": 65535,
+          "x-nullable": true
+        },
         "name": {
           "type": "string"
+        },
+        "noTraversal": {
+          "type": "boolean",
+          "x-nullable": true
         },
         "tags": {
           "$ref": "#/definitions/tags"
@@ -24285,7 +25357,7 @@ func init() {
             "ztSession": []
           }
         ],
-        "description": "Allows an identity to extend its certificate's expiration date by using its current and valid client certificate to submit a CSR. This CSR may be passed in using a new private key, thus allowing private key rotation.\nAfter completion any new connections must be made with certificates returned from a 200 OK response. The previous client certificate is rendered invalid for use with the controller even if it has not expired.\nThis request must be made using the existing, valid, client certificate.",
+        "description": "This endpoint only functions for certificates issued by the controller. 3rd party certificates are not handled.\nAllows an identity to extend its certificate's expiration date by using its current and valid client certificate to submit a CSR. This CSR may be passed in using a new private key, thus allowing private key rotation.\nThe response from this endpoint is a new client certificate which the client must  be verified via the /authenticators/{id}/extend-verify endpoint.\nAfter verification is completion any new connections must be made with new certificate. Prior to verification the old client certificate remains active.",
         "tags": [
           "Current API Session",
           "Enroll",
@@ -24308,6 +25380,74 @@ func init() {
             "description": "A response containg the identity's new certificate",
             "schema": {
               "$ref": "#/definitions/identityExtendEnrollmentEnvelope"
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "type": "string",
+          "description": "The id of the requested resource",
+          "name": "id",
+          "in": "path",
+          "required": true
+        }
+      ]
+    },
+    "/current-identity/authenticators/{id}/extend-verify": {
+      "post": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "After submitting a CSR for a new client certificate the resulting public certificate must be re-submitted to this endpoint to verify receipt.\nAfter receipt, the new client certificate must be used for new authentication requests.",
+        "tags": [
+          "Current API Session",
+          "Enroll",
+          "Extend Enrollment"
+        ],
+        "summary": "Allows the current identity to validate reciept of a new client certificate",
+        "operationId": "extendVerifyCurrentIdentityAuthenticator",
+        "parameters": [
+          {
+            "name": "extend",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/identityExtendValidateEnrollmentRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Base empty response",
+            "schema": {
+              "$ref": "#/definitions/empty"
             }
           },
           "401": {
@@ -27293,6 +28433,706 @@ func init() {
                   "code": "UNAUTHORIZED",
                   "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
                   "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "type": "string",
+          "description": "The id of the requested resource",
+          "name": "id",
+          "in": "path",
+          "required": true
+        }
+      ]
+    },
+    "/enrollments/{id}/refresh": {
+      "post": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "For expired or unexpired enrollments, reset the expiration window. A new JWT will be generated and must be used for the enrollment. If the ` + "`" + `validFrom` + "`" + ` value is not provided it will default to now. If the ` + "`" + `validTo` + "`" + ` value is not provided it will default to ` + "`" + `validFrom` + "`" + `  the controller's configured enrollment timeout.",
+        "tags": [
+          "Enrollment"
+        ],
+        "summary": "Refreshes an enrollment record's expiration window",
+        "operationId": "refreshEnrollment",
+        "parameters": [
+          {
+            "description": "An enrollment refresh request",
+            "name": "refresh",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/enrollmentRefresh"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The create request was successful and the resource has been added at the following location",
+            "schema": {
+              "$ref": "#/definitions/createEnvelope"
+            }
+          },
+          "400": {
+            "description": "The supplied request contains invalid fields or could not be parsed (json and non-json bodies). The error's code, message, and cause fields can be inspected for further information",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": {
+                    "details": {
+                      "context": "(root)",
+                      "field": "(root)",
+                      "property": "fooField3"
+                    },
+                    "field": "(root)",
+                    "message": "(root): fooField3 is required",
+                    "type": "required",
+                    "value": {
+                      "fooField": "abc",
+                      "fooField2": "def"
+                    }
+                  },
+                  "causeMessage": "schema validation failed",
+                  "code": "COULD_NOT_VALIDATE",
+                  "message": "The supplied request contains an invalid document",
+                  "requestId": "ac6766d6-3a09-44b3-8d8a-1b541d97fdd9"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "type": "string",
+          "description": "The id of the requested resource",
+          "name": "id",
+          "in": "path",
+          "required": true
+        }
+      ]
+    },
+    "/external-jwt-signers": {
+      "get": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "Retrieves a list of external JWT signers for authentication",
+        "tags": [
+          "External JWT Signer"
+        ],
+        "summary": "List External JWT Signers",
+        "operationId": "listExternalJwtSigners",
+        "parameters": [
+          {
+            "type": "integer",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "filter",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of External JWT Signers",
+            "schema": {
+              "$ref": "#/definitions/listExternalJwtSignersEnvelope"
+            }
+          },
+          "400": {
+            "description": "The supplied request contains invalid fields or could not be parsed (json and non-json bodies). The error's code, message, and cause fields can be inspected for further information",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": {
+                    "details": {
+                      "context": "(root)",
+                      "field": "(root)",
+                      "property": "fooField3"
+                    },
+                    "field": "(root)",
+                    "message": "(root): fooField3 is required",
+                    "type": "required",
+                    "value": {
+                      "fooField": "abc",
+                      "fooField2": "def"
+                    }
+                  },
+                  "causeMessage": "schema validation failed",
+                  "code": "COULD_NOT_VALIDATE",
+                  "message": "The supplied request contains an invalid document",
+                  "requestId": "ac6766d6-3a09-44b3-8d8a-1b541d97fdd9"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "Creates an External JWT Signer. Requires admin access.",
+        "tags": [
+          "External JWT Signer"
+        ],
+        "summary": "Creates an External JWT Signer",
+        "operationId": "createExternalJwtSigner",
+        "parameters": [
+          {
+            "description": "An External JWT Signer to create",
+            "name": "externalJwtSigner",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/externalJwtSignerCreate"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The create request was successful and the resource has been added at the following location",
+            "schema": {
+              "$ref": "#/definitions/createEnvelope"
+            }
+          },
+          "400": {
+            "description": "The supplied request contains invalid fields or could not be parsed (json and non-json bodies). The error's code, message, and cause fields can be inspected for further information",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": {
+                    "details": {
+                      "context": "(root)",
+                      "field": "(root)",
+                      "property": "fooField3"
+                    },
+                    "field": "(root)",
+                    "message": "(root): fooField3 is required",
+                    "type": "required",
+                    "value": {
+                      "fooField": "abc",
+                      "fooField2": "def"
+                    }
+                  },
+                  "causeMessage": "schema validation failed",
+                  "code": "COULD_NOT_VALIDATE",
+                  "message": "The supplied request contains an invalid document",
+                  "requestId": "ac6766d6-3a09-44b3-8d8a-1b541d97fdd9"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/external-jwt-signers/{id}": {
+      "get": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "Retrieves a single External JWT Signer by id. Requires admin access.",
+        "tags": [
+          "External JWT Signer"
+        ],
+        "summary": "Retrieves a single External JWT Signer",
+        "operationId": "detailExternalJwtSigner",
+        "responses": {
+          "200": {
+            "description": "A singular External JWT Signer resource",
+            "schema": {
+              "$ref": "#/definitions/detailExternalJwtSignerEnvelope"
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {
+                      "id": "71a3000f-7dda-491a-9b90-a19f4ee6c406"
+                    }
+                  },
+                  "cause": null,
+                  "causeMessage": "",
+                  "code": "NOT_FOUND",
+                  "message": "The resource requested was not found or is no longer available",
+                  "requestId": "270908d6-f2ef-4577-b973-67bec18ae376"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "Update all fields on an External JWT Signer by id. Requires admin access.",
+        "tags": [
+          "External JWT Signer"
+        ],
+        "summary": "Update all fields on an External JWT Signer",
+        "operationId": "updateExternalJwtSigner",
+        "parameters": [
+          {
+            "description": "An External JWT Signer update object",
+            "name": "externalJwtSigner",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/externalJwtSignerUpdate"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The update request was successful and the resource has been altered",
+            "schema": {
+              "$ref": "#/definitions/empty"
+            }
+          },
+          "400": {
+            "description": "The supplied request contains invalid fields or could not be parsed (json and non-json bodies). The error's code, message, and cause fields can be inspected for further information",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": {
+                    "details": {
+                      "context": "(root)",
+                      "field": "(root)",
+                      "property": "fooField3"
+                    },
+                    "field": "(root)",
+                    "message": "(root): fooField3 is required",
+                    "type": "required",
+                    "value": {
+                      "fooField": "abc",
+                      "fooField2": "def"
+                    }
+                  },
+                  "causeMessage": "schema validation failed",
+                  "code": "COULD_NOT_VALIDATE",
+                  "message": "The supplied request contains an invalid document",
+                  "requestId": "ac6766d6-3a09-44b3-8d8a-1b541d97fdd9"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {
+                      "id": "71a3000f-7dda-491a-9b90-a19f4ee6c406"
+                    }
+                  },
+                  "cause": null,
+                  "causeMessage": "",
+                  "code": "NOT_FOUND",
+                  "message": "The resource requested was not found or is no longer available",
+                  "requestId": "270908d6-f2ef-4577-b973-67bec18ae376"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "Delete an External JWT Signer by id. Requires admin access.\n",
+        "tags": [
+          "External JWT Signer"
+        ],
+        "summary": "Delete an External JWT Signer",
+        "operationId": "deleteExternalJwtSigner",
+        "responses": {
+          "200": {
+            "description": "The delete request was successful and the resource has been removed",
+            "schema": {
+              "$ref": "#/definitions/empty"
+            }
+          },
+          "400": {
+            "description": "The supplied request contains invalid fields or could not be parsed (json and non-json bodies). The error's code, message, and cause fields can be inspected for further information",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": {
+                    "details": {
+                      "context": "(root)",
+                      "field": "(root)",
+                      "property": "fooField3"
+                    },
+                    "field": "(root)",
+                    "message": "(root): fooField3 is required",
+                    "type": "required",
+                    "value": {
+                      "fooField": "abc",
+                      "fooField2": "def"
+                    }
+                  },
+                  "causeMessage": "schema validation failed",
+                  "code": "COULD_NOT_VALIDATE",
+                  "message": "The supplied request contains an invalid document",
+                  "requestId": "ac6766d6-3a09-44b3-8d8a-1b541d97fdd9"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "security": [
+          {
+            "ztSession": []
+          }
+        ],
+        "description": "Update only the supplied fields on an External JWT Signer by id. Requires admin access.",
+        "tags": [
+          "External JWT Signer"
+        ],
+        "summary": "Update the supplied fields on an External JWT Signer",
+        "operationId": "patchExternalJwtSigner",
+        "parameters": [
+          {
+            "description": "An External JWT Signer patch object",
+            "name": "externalJwtSigner",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/externalJwtSignerPatch"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The patch request was successful and the resource has been altered",
+            "schema": {
+              "$ref": "#/definitions/empty"
+            }
+          },
+          "400": {
+            "description": "The supplied request contains invalid fields or could not be parsed (json and non-json bodies). The error's code, message, and cause fields can be inspected for further information",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": {
+                    "details": {
+                      "context": "(root)",
+                      "field": "(root)",
+                      "property": "fooField3"
+                    },
+                    "field": "(root)",
+                    "message": "(root): fooField3 is required",
+                    "type": "required",
+                    "value": {
+                      "fooField": "abc",
+                      "fooField2": "def"
+                    }
+                  },
+                  "causeMessage": "schema validation failed",
+                  "code": "COULD_NOT_VALIDATE",
+                  "message": "The supplied request contains an invalid document",
+                  "requestId": "ac6766d6-3a09-44b3-8d8a-1b541d97fdd9"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The currently supplied session does not have the correct access rights to request this resource",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {}
+                  },
+                  "cause": "",
+                  "causeMessage": "",
+                  "code": "UNAUTHORIZED",
+                  "message": "The request could not be completed. The session is not authorized or the credentials are invalid",
+                  "requestId": "0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f"
+                },
+                "meta": {
+                  "apiEnrollmentVersion": "0.0.1",
+                  "apiVersion": "0.0.1"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource does not exist",
+            "schema": {
+              "$ref": "#/definitions/apiErrorEnvelope"
+            },
+            "examples": {
+              "application/json": {
+                "error": {
+                  "args": {
+                    "urlVars": {
+                      "id": "71a3000f-7dda-491a-9b90-a19f4ee6c406"
+                    }
+                  },
+                  "cause": null,
+                  "causeMessage": "",
+                  "code": "NOT_FOUND",
+                  "message": "The resource requested was not found or is no longer available",
+                  "requestId": "270908d6-f2ef-4577-b973-67bec18ae376"
                 },
                 "meta": {
                   "apiEnrollmentVersion": "0.0.1",
@@ -35881,11 +37721,15 @@ func init() {
             "authQueries",
             "cachedUpdatedAt",
             "isMfaRequired",
-            "isMfaComplete"
+            "isMfaComplete",
+            "authenticatorId"
           ],
           "properties": {
             "authQueries": {
               "$ref": "#/definitions/authQueryList"
+            },
+            "authenticatorId": {
+              "type": "string"
             },
             "cachedLastActivityAt": {
               "type": "string",
@@ -36401,11 +38245,19 @@ func init() {
         "name",
         "supportedProtocols",
         "syncStatus",
-        "isOnline"
+        "isOnline",
+        "cost",
+        "noTraversal"
       ],
       "properties": {
         "appData": {
           "$ref": "#/definitions/tags"
+        },
+        "cost": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": 0,
+          "x-nullable": true
         },
         "hostname": {
           "type": "string"
@@ -36415,6 +38267,10 @@ func init() {
         },
         "name": {
           "type": "string"
+        },
+        "noTraversal": {
+          "type": "boolean",
+          "x-nullable": true
         },
         "supportedProtocols": {
           "type": "object",
@@ -36914,6 +38770,21 @@ func init() {
         }
       }
     },
+    "detailExternalJwtSignerEnvelope": {
+      "type": "object",
+      "required": [
+        "meta",
+        "data"
+      ],
+      "properties": {
+        "data": {
+          "$ref": "#/definitions/externalJwtSignerDetail"
+        },
+        "meta": {
+          "$ref": "#/definitions/meta"
+        }
+      }
+    },
     "detailIdentityEnvelope": {
       "type": "object",
       "required": [
@@ -36977,10 +38848,10 @@ func init() {
       "type": "object",
       "required": [
         "meta",
-        "error"
+        "data"
       ],
       "properties": {
-        "error": {
+        "data": {
           "$ref": "#/definitions/detailMfa"
         },
         "meta": {
@@ -37227,11 +39098,21 @@ func init() {
         "appData": {
           "$ref": "#/definitions/tags"
         },
+        "cost": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": 0,
+          "x-nullable": true
+        },
         "isTunnelerEnabled": {
           "type": "boolean"
         },
         "name": {
           "type": "string"
+        },
+        "noTraversal": {
+          "type": "boolean",
+          "x-nullable": true
         },
         "roleAttributes": {
           "$ref": "#/definitions/attributes"
@@ -37324,6 +39205,7 @@ func init() {
             "href": "./edge-routers/b0766b8d-bd1a-4d28-8415-639b29d3c83d"
           }
         },
+        "cost": 0,
         "createdAt": "2020-03-16T17:13:31.5807454Z",
         "enrollmentCreatedAt": "2020-03-16T17:13:31.5777637Z",
         "enrollmentExpiresAt": "2020-03-16T17:18:31.5777637Z",
@@ -37336,6 +39218,7 @@ func init() {
         "isTunnelerEnabled": false,
         "isVerified": false,
         "name": "TestRouter-e33c837f-3222-4b40-bcd6-b3458fd5156e",
+        "noTraversal": false,
         "roleAttributes": [
           "eastCoast",
           "sales",
@@ -37360,11 +39243,21 @@ func init() {
         "appData": {
           "$ref": "#/definitions/tags"
         },
+        "cost": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": 0,
+          "x-nullable": true
+        },
         "isTunnelerEnabled": {
           "type": "boolean"
         },
         "name": {
           "type": "string"
+        },
+        "noTraversal": {
+          "type": "boolean",
+          "x-nullable": true
         },
         "roleAttributes": {
           "$ref": "#/definitions/attributes"
@@ -37498,11 +39391,21 @@ func init() {
         "appData": {
           "$ref": "#/definitions/tags"
         },
+        "cost": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": 0,
+          "x-nullable": true
+        },
         "isTunnelerEnabled": {
           "type": "boolean"
         },
         "name": {
           "type": "string"
+        },
+        "noTraversal": {
+          "type": "boolean",
+          "x-nullable": true
         },
         "roleAttributes": {
           "$ref": "#/definitions/attributes"
@@ -37618,6 +39521,19 @@ func init() {
         "$ref": "#/definitions/enrollmentDetail"
       }
     },
+    "enrollmentRefresh": {
+      "type": "object",
+      "properties": {
+        "validFrom": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "validTo": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
     "entityRef": {
       "description": "A reference to another resource and links to interact with it",
       "type": "object",
@@ -37651,6 +39567,128 @@ func init() {
         },
         "osVersion": {
           "type": "string"
+        }
+      }
+    },
+    "externalJwtSignerCreate": {
+      "description": "A create Certificate Authority (CA) object",
+      "type": "object",
+      "required": [
+        "name",
+        "certPem",
+        "enabled"
+      ],
+      "properties": {
+        "certPem": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string",
+          "example": "MyApps Signer"
+        },
+        "tags": {
+          "$ref": "#/definitions/tags"
+        }
+      }
+    },
+    "externalJwtSignerDetail": {
+      "description": "A External JWT Signer resource",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/baseEntity"
+        },
+        {
+          "type": "object",
+          "required": [
+            "name",
+            "certPem",
+            "enabled",
+            "fingerprint",
+            "commonName",
+            "notAfter",
+            "notBefore"
+          ],
+          "properties": {
+            "certPem": {
+              "type": "string"
+            },
+            "commonName": {
+              "type": "string"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "fingerprint": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string",
+              "example": "MyApps Signer"
+            },
+            "notAfter": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "notBefore": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      ]
+    },
+    "externalJwtSignerList": {
+      "description": "An array of External JWT Signers resources",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/externalJwtSignerDetail"
+      }
+    },
+    "externalJwtSignerPatch": {
+      "type": "object",
+      "properties": {
+        "certPem": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "enabled": {
+          "type": "boolean",
+          "x-nullable": true
+        },
+        "name": {
+          "type": "string",
+          "x-nullable": true,
+          "example": "MyApps Signer"
+        },
+        "tags": {
+          "$ref": "#/definitions/tags"
+        }
+      }
+    },
+    "externalJwtSignerUpdate": {
+      "type": "object",
+      "required": [
+        "name",
+        "certPem",
+        "enabled"
+      ],
+      "properties": {
+        "certPem": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string",
+          "example": "MyApps Signer"
+        },
+        "tags": {
+          "$ref": "#/definitions/tags"
         }
       }
     },
@@ -37979,6 +40017,18 @@ func init() {
         }
       }
     },
+    "identityExtendValidateEnrollmentRequest": {
+      "type": "object",
+      "required": [
+        "clientCert"
+      ],
+      "properties": {
+        "clientCert": {
+          "description": "A PEM encoded client certificate previously returned after an extension request",
+          "type": "string"
+        }
+      }
+    },
     "identityList": {
       "description": "A list of identities",
       "type": "array",
@@ -38228,6 +40278,21 @@ func init() {
       "properties": {
         "data": {
           "$ref": "#/definitions/enrollmentList"
+        },
+        "meta": {
+          "$ref": "#/definitions/meta"
+        }
+      }
+    },
+    "listExternalJwtSignersEnvelope": {
+      "type": "object",
+      "required": [
+        "meta",
+        "data"
+      ],
+      "properties": {
+        "data": {
+          "$ref": "#/definitions/externalJwtSignerList"
         },
         "meta": {
           "$ref": "#/definitions/meta"
@@ -38889,11 +40954,15 @@ func init() {
           "type": "object",
           "required": [
             "actualValue",
-            "expectedValue"
+            "expectedValue",
+            "criteria"
           ],
           "properties": {
             "actualValue": {
               "$ref": "#/definitions/postureChecksFailureMfaValues"
+            },
+            "criteria": {
+              "$ref": "#/definitions/postureChecksFailureMfaCriteria"
             },
             "expectedValue": {
               "$ref": "#/definitions/postureChecksFailureMfaValues"
@@ -39553,20 +41622,54 @@ func init() {
       },
       "discriminator": "typeId"
     },
+    "postureChecksFailureMfaCriteria": {
+      "type": "object",
+      "required": [
+        "passedMfaAt",
+        "wokenAt",
+        "unlockedAt",
+        "timeoutSeconds",
+        "timeoutRemainingSeconds"
+      ],
+      "properties": {
+        "passedMfaAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "timeoutRemainingSeconds": {
+          "type": "integer"
+        },
+        "timeoutSeconds": {
+          "type": "integer"
+        },
+        "unlockedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "wokenAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
     "postureChecksFailureMfaValues": {
       "type": "object",
       "properties": {
         "passedMfa": {
-          "type": "boolean"
+          "type": "boolean",
+          "x-omitempty": false
         },
         "passedOnUnlock": {
-          "type": "boolean"
+          "type": "boolean",
+          "x-omitempty": false
         },
         "passedOnWake": {
-          "type": "boolean"
+          "type": "boolean",
+          "x-omitempty": false
         },
         "timedOut": {
-          "type": "boolean"
+          "type": "boolean",
+          "x-omitempty": false
         }
       }
     },
@@ -39702,20 +41805,29 @@ func init() {
         "apiSessionId",
         "passedMfa",
         "passedOnWake",
-        "passedOnUnlock"
+        "passedOnUnlock",
+        "passedAt"
       ],
       "properties": {
         "apiSessionId": {
           "type": "string"
         },
+        "passedAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-omitempty": false
+        },
         "passedMfa": {
-          "type": "boolean"
+          "type": "boolean",
+          "x-omitempty": false
         },
         "passedOnUnlock": {
-          "type": "boolean"
+          "type": "boolean",
+          "x-omitempty": false
         },
         "passedOnWake": {
-          "type": "boolean"
+          "type": "boolean",
+          "x-omitempty": false
         }
       }
     },
@@ -39918,8 +42030,18 @@ func init() {
         "name"
       ],
       "properties": {
+        "cost": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": 0,
+          "x-nullable": true
+        },
         "name": {
           "type": "string"
+        },
+        "noTraversal": {
+          "type": "boolean",
+          "x-nullable": true
         },
         "tags": {
           "$ref": "#/definitions/tags"
@@ -39938,9 +42060,16 @@ func init() {
             "name",
             "isVerified",
             "isOnline",
-            "fingerprint"
+            "fingerprint",
+            "cost",
+            "noTraversal"
           ],
           "properties": {
+            "cost": {
+              "type": "integer",
+              "maximum": 65535,
+              "minimum": 0
+            },
             "enrollmentCreatedAt": {
               "type": "string",
               "format": "date-time",
@@ -39970,6 +42099,9 @@ func init() {
             },
             "name": {
               "type": "string"
+            },
+            "noTraversal": {
+              "type": "boolean"
             },
             "unverifiedCertPem": {
               "type": "string",
@@ -40013,8 +42145,18 @@ func init() {
     "routerPatch": {
       "type": "object",
       "properties": {
+        "cost": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": 0,
+          "x-nullable": true
+        },
         "name": {
           "type": "string"
+        },
+        "noTraversal": {
+          "type": "boolean",
+          "x-nullable": true
         },
         "tags": {
           "$ref": "#/definitions/tags"
@@ -40027,8 +42169,18 @@ func init() {
         "name"
       ],
       "properties": {
+        "cost": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": 0,
+          "x-nullable": true
+        },
         "name": {
           "type": "string"
+        },
+        "noTraversal": {
+          "type": "boolean",
+          "x-nullable": true
         },
         "tags": {
           "$ref": "#/definitions/tags"

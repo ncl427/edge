@@ -46,12 +46,20 @@ type EdgeRouterCreate struct {
 	// app data
 	AppData *Tags `json:"appData,omitempty"`
 
+	// cost
+	// Maximum: 65535
+	// Minimum: 0
+	Cost *int64 `json:"cost,omitempty"`
+
 	// is tunneler enabled
 	IsTunnelerEnabled bool `json:"isTunnelerEnabled,omitempty"`
 
 	// name
 	// Required: true
 	Name *string `json:"name"`
+
+	// no traversal
+	NoTraversal *bool `json:"noTraversal,omitempty"`
 
 	// role attributes
 	RoleAttributes *Attributes `json:"roleAttributes,omitempty"`
@@ -65,6 +73,10 @@ func (m *EdgeRouterCreate) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateAppData(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateCost(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -100,6 +112,22 @@ func (m *EdgeRouterCreate) validateAppData(formats strfmt.Registry) error {
 			}
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (m *EdgeRouterCreate) validateCost(formats strfmt.Registry) error {
+	if swag.IsZero(m.Cost) { // not required
+		return nil
+	}
+
+	if err := validate.MinimumInt("cost", "body", *m.Cost, 0, false); err != nil {
+		return err
+	}
+
+	if err := validate.MaximumInt("cost", "body", *m.Cost, 65535, false); err != nil {
+		return err
 	}
 
 	return nil

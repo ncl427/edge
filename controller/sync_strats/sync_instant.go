@@ -22,6 +22,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/lucsky/cuid"
 	"github.com/michaelquigley/pfxlog"
+	"github.com/openziti/channel"
 	"github.com/openziti/edge/controller/env"
 	"github.com/openziti/edge/controller/handler_edge_ctrl"
 	"github.com/openziti/edge/controller/model"
@@ -29,7 +30,6 @@ import (
 	"github.com/openziti/edge/pb/edge_ctrl_pb"
 	"github.com/openziti/fabric/build"
 	"github.com/openziti/fabric/controller/network"
-	"github.com/openziti/foundation/channel2"
 	"github.com/openziti/foundation/storage/ast"
 	"github.com/openziti/foundation/util/debugz"
 	"go.etcd.io/bbolt"
@@ -80,8 +80,8 @@ type InstantStrategy struct {
 
 	rtxMap *routerTxMap
 
-	helloHandler  channel2.ReceiveHandler
-	resyncHandler channel2.ReceiveHandler
+	helloHandler  channel.TypedReceiveHandler
+	resyncHandler channel.TypedReceiveHandler
 	ae            *env.AppEnv
 
 	routerConnectedQueue     chan *RouterSender
@@ -182,6 +182,17 @@ func (strategy *InstantStrategy) RouterDisconnected(router *network.Router) {
 	strategy.rtxMap.Remove(router.Id)
 }
 
+func (strategy *InstantStrategy) GetReceiveHandlers() []channel.TypedReceiveHandler {
+	var result []channel.TypedReceiveHandler
+	if strategy.helloHandler != nil {
+		result = append(result, strategy.helloHandler)
+	}
+	if strategy.resyncHandler != nil {
+		result = append(result, strategy.resyncHandler)
+	}
+	return result
+}
+
 func (strategy *InstantStrategy) ApiSessionAdded(apiSession *persistence.ApiSession) {
 	logger := pfxlog.Logger().WithField("strategy", strategy.Type())
 
@@ -222,7 +233,7 @@ func (strategy *InstantStrategy) ApiSessionUpdated(apiSession *persistence.ApiSe
 
 	strategy.rtxMap.Range(func(rtx *RouterSender) {
 		content, _ := proto.Marshal(apiSessionAdded)
-		msg := channel2.NewMessage(env.ApiSessionUpdatedType, content)
+		msg := channel.NewMessage(env.ApiSessionUpdatedType, content)
 		msg.Headers[env.SyncStrategyTypeHeader] = []byte(strategy.Type())
 		msg.Headers[env.SyncStrategyStateHeader] = nil
 		_ = rtx.Send(msg)
@@ -236,7 +247,7 @@ func (strategy *InstantStrategy) ApiSessionDeleted(apiSession *persistence.ApiSe
 
 	strategy.rtxMap.Range(func(rtx *RouterSender) {
 		content, _ := proto.Marshal(sessionRemoved)
-		msg := channel2.NewMessage(env.ApiSessionRemovedType, content)
+		msg := channel.NewMessage(env.ApiSessionRemovedType, content)
 		_ = rtx.Send(msg)
 	})
 }
@@ -248,7 +259,7 @@ func (strategy *InstantStrategy) SessionDeleted(session *persistence.Session) {
 
 	strategy.rtxMap.Range(func(rtx *RouterSender) {
 		content, _ := proto.Marshal(sessionRemoved)
-		msg := channel2.NewMessage(env.SessionRemovedType, content)
+		msg := channel.NewMessage(env.SessionRemovedType, content)
 		_ = rtx.Send(msg)
 	})
 }
@@ -294,7 +305,6 @@ func (strategy *InstantStrategy) startSynchronizeWorker() {
 }
 
 func (strategy *InstantStrategy) hello(rtx *RouterSender) {
-
 	logger := rtx.logger().WithField("strategy", strategy.Type())
 
 	logger.Info("edge router sync starting")
@@ -305,7 +315,6 @@ func (strategy *InstantStrategy) hello(rtx *RouterSender) {
 		return
 	}
 
-	rtx.Router.Control.AddReceiveHandler(strategy.helloHandler)
 	rtx.SetSyncStatus(env.RouterSyncHello)
 	logger.WithField("syncStatus", rtx.SyncStatus()).Info("sending edge router hello")
 	strategy.sendHello(rtx)
@@ -324,7 +333,7 @@ func (strategy *InstantStrategy) sendHello(rtx *RouterSender) {
 		return
 	}
 
-	if err = rtx.Router.Control.SendWithTimeout(channel2.NewMessage(env.ServerHelloType, buf), strategy.HelloSendTimeout); err != nil {
+	if err = channel.NewMessage(env.ServerHelloType, buf).WithTimeout(strategy.HelloSendTimeout).Send(rtx.Router.Control); err != nil {
 		if rtx.Router.Control.IsClosed() {
 			rtx.SetSyncStatus(env.RouterSyncDisconnected)
 			rtx.logger().WithError(err).Error("timed out sending serverHello message for edge router, connection closed, giving up")
@@ -482,7 +491,7 @@ func (strategy *InstantStrategy) sendApiSessionAdded(rtx *RouterSender, isFullSt
 
 	msgContentBytes, _ := proto.Marshal(msgContent)
 
-	msg := channel2.NewMessage(env.ApiSessionAddedType, msgContentBytes)
+	msg := channel.NewMessage(env.ApiSessionAddedType, msgContentBytes)
 
 	msg.Headers[env.SyncStrategyTypeHeader] = []byte(strategy.Type())
 	msg.Headers[env.SyncStrategyStateHeader] = stateBytes

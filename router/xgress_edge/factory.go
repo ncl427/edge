@@ -19,13 +19,13 @@ package xgress_edge
 import (
 	"fmt"
 	"github.com/michaelquigley/pfxlog"
+	"github.com/openziti/channel"
 	"github.com/openziti/edge/router/fabric"
 	"github.com/openziti/edge/router/handler_edge_ctrl"
 	"github.com/openziti/edge/router/internal/apiproxy"
 	"github.com/openziti/edge/router/internal/edgerouter"
 	"github.com/openziti/fabric/router"
 	"github.com/openziti/fabric/router/xgress"
-	"github.com/openziti/foundation/channel2"
 	"github.com/openziti/foundation/common"
 	"github.com/openziti/foundation/identity/identity"
 	"github.com/openziti/foundation/metrics"
@@ -37,7 +37,7 @@ import (
 
 type Factory struct {
 	id               *identity.TokenId
-	ctrl             channel2.Channel
+	ctrl             channel.Channel
 	enabled          bool
 	routerConfig     *router.Config
 	edgeRouterConfig *edgerouter.Config
@@ -48,7 +48,7 @@ type Factory struct {
 	metricsRegistry  metrics.Registry
 }
 
-func (factory *Factory) Channel() channel2.Channel {
+func (factory *Factory) Channel() channel.Channel {
 	return factory.ctrl
 }
 
@@ -60,8 +60,8 @@ func (factory *Factory) Enabled() bool {
 	return factory.enabled
 }
 
-func (factory *Factory) BindChannel(ch channel2.Channel) error {
-	factory.ctrl = ch
+func (factory *Factory) BindChannel(binding channel.Binding) error {
+	factory.ctrl = binding.GetChannel()
 
 	var parts []string
 	var hostname string
@@ -88,15 +88,15 @@ func (factory *Factory) BindChannel(ch channel2.Channel) error {
 		protocolPorts = append(protocolPorts, "ws:"+parts[1])
 		pfxlog.Logger().Debugf("HelloHandler will contain hostname=[%s] supportedProtocols=%v protocolPorts=%v", hostname, supportedProtocols, protocolPorts)
 	}
-	ch.AddReceiveHandler(handler_edge_ctrl.NewHelloHandler(hostname, supportedProtocols, protocolPorts))
+	binding.AddTypedReceiveHandler(handler_edge_ctrl.NewHelloHandler(hostname, supportedProtocols, protocolPorts))
 
-	ch.AddReceiveHandler(handler_edge_ctrl.NewSessionRemovedHandler(factory.stateManager))
+	binding.AddTypedReceiveHandler(handler_edge_ctrl.NewSessionRemovedHandler(factory.stateManager))
 
-	ch.AddReceiveHandler(handler_edge_ctrl.NewApiSessionAddedHandler(factory.stateManager, ch))
-	ch.AddReceiveHandler(handler_edge_ctrl.NewApiSessionRemovedHandler(factory.stateManager))
-	ch.AddReceiveHandler(handler_edge_ctrl.NewApiSessionUpdatedHandler(factory.stateManager))
+	binding.AddTypedReceiveHandler(handler_edge_ctrl.NewApiSessionAddedHandler(factory.stateManager, binding))
+	binding.AddTypedReceiveHandler(handler_edge_ctrl.NewApiSessionRemovedHandler(factory.stateManager))
+	binding.AddTypedReceiveHandler(handler_edge_ctrl.NewApiSessionUpdatedHandler(factory.stateManager))
 
-	ch.AddReceiveHandler(handler_edge_ctrl.NewExtendEnrollmentCertsHandler(factory.routerConfig.Id, func() {
+	binding.AddTypedReceiveHandler(handler_edge_ctrl.NewExtendEnrollmentCertsHandler(factory.routerConfig.Id, func() {
 		factory.certChecker.CertsUpdated()
 	}))
 
@@ -107,11 +107,11 @@ func (factory *Factory) NotifyOfReconnect() {
 	go factory.stateManager.ValidateSessions(factory.Channel(), factory.edgeRouterConfig.SessionValidateChunkSize, factory.edgeRouterConfig.SessionValidateMinInterval, factory.edgeRouterConfig.SessionValidateMaxInterval)
 }
 
-func (factory *Factory) GetTraceDecoders() []channel2.TraceMessageDecoder {
+func (factory *Factory) GetTraceDecoders() []channel.TraceMessageDecoder {
 	return nil
 }
 
-func (factory *Factory) Run(ctrl channel2.Channel, _ boltz.Db, closeNotify chan struct{}) error {
+func (factory *Factory) Run(ctrl channel.Channel, _ boltz.Db, closeNotify chan struct{}) error {
 	factory.ctrl = ctrl
 	factory.stateManager.StartHeartbeat(ctrl, factory.edgeRouterConfig.HeartbeatIntervalSeconds, closeNotify)
 	factory.certChecker = NewCertExpirationChecker(factory.routerConfig.Id, factory.edgeRouterConfig, ctrl, closeNotify)
@@ -175,7 +175,7 @@ func (factory *Factory) CreateListener(optionsData xgress.OptionsData) (xgress.L
 	}
 
 	headers := map[int32][]byte{
-		channel2.HelloVersionHeader: versionHeader,
+		channel.HelloVersionHeader: versionHeader,
 	}
 
 	return newListener(factory.id, factory, options, headers), nil
@@ -197,7 +197,7 @@ func (factory *Factory) CreateDialer(optionsData xgress.OptionsData) (xgress.Dia
 
 type Options struct {
 	xgress.Options
-	channelOptions          *channel2.Options
+	channelOptions          *channel.Options
 	lookupApiSessionTimeout time.Duration
 	lookupSessionTimeout    time.Duration
 }
@@ -228,7 +228,7 @@ func (options *Options) ToLoggableString() string {
 	buf.WriteString(fmt.Sprintf("lookupSessionTimeout=%v\n", options.lookupSessionTimeout))
 
 	buf.WriteString(fmt.Sprintf("channel.outQueueSize=%v\n", options.channelOptions.OutQueueSize))
-	buf.WriteString(fmt.Sprintf("channel.connectTimeoutMs=%v\n", options.channelOptions.ConnectTimeoutMs))
+	buf.WriteString(fmt.Sprintf("channel.connectTimeout=%v\n", options.channelOptions.ConnectTimeout))
 	buf.WriteString(fmt.Sprintf("channel.maxOutstandingConnects=%v\n", options.channelOptions.MaxOutstandingConnects))
 	buf.WriteString(fmt.Sprintf("channel.maxQueuedConnects=%v\n", options.channelOptions.MaxQueuedConnects))
 
@@ -247,7 +247,11 @@ func (options *Options) load(data xgress.OptionsData) error {
 	if value, found := data["options"]; found {
 		data = value.(map[interface{}]interface{})
 
-		options.channelOptions = channel2.LoadOptions(data)
+		var err error
+		options.channelOptions, err = channel.LoadOptions(data)
+		if err != nil {
+			return err
+		}
 		if err := options.channelOptions.Validate(); err != nil {
 			return fmt.Errorf("error loading options for [edge/options]: %v", err)
 		}
@@ -268,7 +272,7 @@ func (options *Options) load(data xgress.OptionsData) error {
 			options.lookupApiSessionTimeout = timeout
 		}
 	} else {
-		options.channelOptions = channel2.DefaultOptions()
+		options.channelOptions = channel.DefaultOptions()
 	}
 	return nil
 }

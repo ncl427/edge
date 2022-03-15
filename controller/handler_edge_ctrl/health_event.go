@@ -19,10 +19,10 @@ package handler_edge_ctrl
 import (
 	"github.com/golang/protobuf/proto"
 	"github.com/michaelquigley/pfxlog"
+	"github.com/openziti/channel"
 	"github.com/openziti/edge/controller/env"
 	"github.com/openziti/edge/controller/persistence"
 	"github.com/openziti/edge/pb/edge_ctrl_pb"
-	"github.com/openziti/foundation/channel2"
 	"github.com/openziti/foundation/metrics"
 	"time"
 )
@@ -33,7 +33,7 @@ type healthEventHandler struct {
 	serviceHealthCheckFailedCounter metrics.IntervalCounter
 }
 
-func NewHealthEventHandler(appEnv *env.AppEnv, ch channel2.Channel) channel2.ReceiveHandler {
+func NewHealthEventHandler(appEnv *env.AppEnv, ch channel.Channel) channel.TypedReceiveHandler {
 	serviceEventMetrics := appEnv.GetHostController().GetNetwork().GetServiceEventsMetricsRegistry()
 	return &healthEventHandler{
 		baseRequestHandler: baseRequestHandler{
@@ -53,7 +53,7 @@ func (self *healthEventHandler) Label() string {
 	return "health.event"
 }
 
-func (self *healthEventHandler) HandleReceive(msg *channel2.Message, ch channel2.Channel) {
+func (self *healthEventHandler) HandleReceive(msg *channel.Message, ch channel.Channel) {
 	req := &edge_ctrl_pb.HealthEventRequest{}
 	if err := proto.Unmarshal(msg.Body, req); err != nil {
 		pfxlog.ContextLogger(ch.Label()).WithError(err).Error("could not unmarshal health event")

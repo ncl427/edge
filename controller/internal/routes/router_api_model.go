@@ -2,6 +2,7 @@ package routes
 
 import (
 	"fmt"
+
 	"github.com/go-openapi/strfmt"
 	"github.com/michaelquigley/pfxlog"
 	"github.com/openziti/edge/controller/env"
@@ -18,8 +19,10 @@ var TransitRouterLinkFactory = NewBasicLinkFactory(EntityNameTransitRouter)
 
 func MapCreateRouterToModel(router *rest_model.RouterCreate) *model.TransitRouter {
 	ret := &model.TransitRouter{
-		BaseEntity: models.BaseEntity{},
-		Name:       stringz.OrEmpty(router.Name),
+		BaseEntity:  models.BaseEntity{},
+		Name:        stringz.OrEmpty(router.Name),
+		Cost:        uint16(Int64OrDefault(router.Cost)),
+		NoTraversal: BoolOrDefault(router.NoTraversal),
 	}
 
 	return ret
@@ -31,7 +34,9 @@ func MapUpdateTransitRouterToModel(id string, router *rest_model.RouterUpdate) *
 			Tags: TagsOrDefault(router.Tags),
 			Id:   id,
 		},
-		Name: stringz.OrEmpty(router.Name),
+		Name:        stringz.OrEmpty(router.Name),
+		Cost:        uint16(Int64OrDefault(router.Cost)),
+		NoTraversal: BoolOrDefault(router.NoTraversal),
 	}
 
 	return ret
@@ -43,7 +48,9 @@ func MapPatchTransitRouterToModel(id string, router *rest_model.RouterPatch) *mo
 			Tags: TagsOrDefault(router.Tags),
 			Id:   id,
 		},
-		Name: router.Name,
+		Name:        router.Name,
+		Cost:        uint16(Int64OrDefault(router.Cost)),
+		NoTraversal: BoolOrDefault(router.NoTraversal),
 	}
 
 	return ret
@@ -72,6 +79,7 @@ func MapTransitRouterToRestEntity(ae *env.AppEnv, _ *response.RequestContext, e 
 
 func MapTransitRouterToRestModel(ae *env.AppEnv, router *model.TransitRouter) (*rest_model.RouterDetail, error) {
 	isConnected := ae.GetHandlers().Router.IsConnected(router.GetId())
+	cost := int64(router.Cost)
 	ret := &rest_model.RouterDetail{
 		BaseEntity:            BaseEntityToRestModel(router, TransitRouterLinkFactory),
 		Fingerprint:           router.Fingerprint,
@@ -80,6 +88,8 @@ func MapTransitRouterToRestModel(ae *env.AppEnv, router *model.TransitRouter) (*
 		Name:                  &router.Name,
 		UnverifiedFingerprint: router.UnverifiedFingerprint,
 		UnverifiedCertPem:     router.UnverifiedCertPem,
+		Cost:                  &cost,
+		NoTraversal:           &router.NoTraversal,
 	}
 
 	if !router.IsBase && !router.IsVerified {

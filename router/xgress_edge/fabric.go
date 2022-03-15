@@ -18,9 +18,9 @@ package xgress_edge
 
 import (
 	"github.com/michaelquigley/pfxlog"
+	"github.com/openziti/channel"
 	"github.com/openziti/edge/router/xgress_common"
 	"github.com/openziti/fabric/router/xgress"
-	"github.com/openziti/foundation/channel2"
 	"github.com/openziti/foundation/util/concurrenz"
 	"github.com/openziti/sdk-golang/ziti/edge"
 	"github.com/pkg/errors"
@@ -111,7 +111,7 @@ type edgeXgressConn struct {
 	ctrlRx  xgress.ControlReceiver
 }
 
-func (self *edgeXgressConn) HandleControlMsg(controlType xgress.ControlType, headers channel2.Headers, responder xgress.ControlReceiver) error {
+func (self *edgeXgressConn) HandleControlMsg(controlType xgress.ControlType, headers channel.Headers, responder xgress.ControlReceiver) error {
 	if controlType == xgress.ControlTypeTraceRouteResponse {
 		ts, _ := headers.GetUint64Header(xgress.ControlTimestamp)
 		hop, _ := headers.GetUint32Header(xgress.ControlHopCount)
@@ -120,7 +120,7 @@ func (self *edgeXgressConn) HandleControlMsg(controlType xgress.ControlType, hea
 		requestSeq, _ := headers.GetUint32Header(xgress.ControlCustom1)
 
 		msg := edge.NewTraceRouteResponseMsg(self.Id(), hop, ts, hopType, hopId)
-		msg.PutUint32Header(channel2.ReplyForHeader, requestSeq)
+		msg.PutUint32Header(channel.ReplyForHeader, requestSeq)
 
 		self.TraceMsg("write", msg)
 		pfxlog.Logger().WithFields(edge.GetLoggerFields(msg)).Trace("writing trace response")
@@ -132,7 +132,7 @@ func (self *edgeXgressConn) HandleControlMsg(controlType xgress.ControlType, hea
 		hop, _ := headers.GetUint32Header(xgress.ControlHopCount)
 		if hop == 1 {
 			// TODO: find a way to get terminator id for hopId
-			xgress.RespondToTraceRequest(headers, "xgress/edge", "", responder)
+			xgress.RespondToTraceRequest(channel.Headers(headers), "xgress/edge", "", responder)
 			return nil
 		}
 
@@ -261,9 +261,9 @@ func (self *edgeXgressConn) close(notify bool, reason string) {
 	}
 }
 
-func (self *edgeXgressConn) Accept(msg *channel2.Message) {
+func (self *edgeXgressConn) Accept(msg *channel.Message) {
 	if msg.ContentType == edge.ContentTypeTraceRoute {
-		headers := channel2.Headers{}
+		headers := channel.Headers{}
 		ts, _ := msg.GetUint64Header(edge.TimestampHeader)
 		hops, _ := msg.GetUint32Header(edge.TraceHopCountHeader)
 
@@ -272,9 +272,9 @@ func (self *edgeXgressConn) Accept(msg *channel2.Message) {
 
 		headers.PutUint32Header(xgress.ControlCustom1, uint32(msg.Sequence()))
 
-		self.ctrlRx.HandleControlReceive(xgress.ControlTypeTraceRoute, headers)
+		self.ctrlRx.HandleControlReceive(xgress.ControlTypeTraceRoute, channel.Headers(headers))
 	} else if msg.ContentType == edge.ContentTypeTraceRouteResponse {
-		headers := channel2.Headers{}
+		headers := channel.Headers{}
 		ts, _ := msg.GetUint64Header(edge.TimestampHeader)
 		hopCount, _ := msg.GetUint32Header(edge.TraceHopCountHeader)
 		hopType, _ := msg.GetStringHeader(edge.TraceHopTypeHeader)
@@ -287,7 +287,7 @@ func (self *edgeXgressConn) Accept(msg *channel2.Message) {
 		headers.PutStringHeader(xgress.ControlHopId, hopId)
 		headers.PutUint32Header(xgress.ControlCustom1, sourceRequestId)
 
-		self.ctrlRx.HandleControlReceive(xgress.ControlTypeTraceRouteResponse, headers)
+		self.ctrlRx.HandleControlReceive(xgress.ControlTypeTraceRouteResponse, channel.Headers(headers))
 	} else {
 		if err := self.seq.Push(msg); err != nil {
 			pfxlog.Logger().WithFields(edge.GetLoggerFields(msg)).Errorf("failed to dispatch to fabric: (%v)", err)
@@ -295,7 +295,7 @@ func (self *edgeXgressConn) Accept(msg *channel2.Message) {
 	}
 }
 
-func (self *edgeXgressConn) getHeaderMap(message *channel2.Message) map[uint8][]byte {
+func (self *edgeXgressConn) getHeaderMap(message *channel.Message) map[uint8][]byte {
 	headers := make(map[uint8][]byte)
 	msgUUID, found := message.Headers[edge.UUIDHeader]
 	if found {

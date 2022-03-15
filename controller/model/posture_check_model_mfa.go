@@ -41,6 +41,29 @@ type PostureCheckMfa struct {
 	IgnoreLegacyEndpoints bool
 }
 
+func (p *PostureCheckMfa) LastUpdatedAt(apiSessionId string, pd *PostureData) *time.Time {
+	apiSessionData := pd.ApiSessions[apiSessionId]
+
+	//not enough data yet
+	if apiSessionData == nil || apiSessionData.Mfa == nil || apiSessionData.EndpointState == nil {
+		return nil
+	}
+
+	var ret *time.Time = nil
+
+	if p.PromptOnWake && apiSessionData.EndpointState.WokenAt != nil {
+		ret = apiSessionData.EndpointState.WokenAt
+	}
+
+	if p.PromptOnUnlock && apiSessionData.EndpointState.UnlockedAt != nil {
+		if ret == nil || apiSessionData.EndpointState.UnlockedAt.After(*ret) {
+			ret = apiSessionData.EndpointState.UnlockedAt
+		}
+	}
+
+	return ret
+}
+
 func (p *PostureCheckMfa) IsLegacyClient(apiSessionData *ApiSessionPostureData) bool {
 	if apiSessionData.SdkInfo == nil {
 		return true // don't know what it is
@@ -144,13 +167,31 @@ func (p *PostureCheckMfa) FailureValues(apiSessionId string, pd *PostureData) Po
 			TimedOutSeconds:       false,
 			IgnoreLegacyEndpoints: p.IgnoreLegacyEndpoints,
 		},
+		Criteria: PostureCheckMfaCriteria{
+			PassedMfaAt:             nil,
+			WokenAt:                 nil,
+			UnlockedAt:              nil,
+			TimeoutSeconds:          0,
+			TimeoutRemainingSeconds: 0,
+		},
 	}
+
+	ret.Criteria.TimeoutSeconds = p.GetTimeoutSeconds()
 
 	if apiSessionData, ok := pd.ApiSessions[apiSessionId]; ok {
 		if apiSessionData.Mfa != nil {
 			ret.ActualValue.TimedOutSeconds = apiSessionData.Mfa.TimedOut
 			ret.ActualValue.PassedMfa = apiSessionData.Mfa.PassedMfaAt != nil
+
+			ret.Criteria.PassedMfaAt = apiSessionData.Mfa.PassedMfaAt
+			ret.Criteria.TimeoutRemainingSeconds = p.GetTimeoutRemainingSeconds(apiSessionId, pd)
 		}
+
+		if apiSessionData.EndpointState != nil {
+			ret.Criteria.UnlockedAt = apiSessionData.EndpointState.UnlockedAt
+			ret.Criteria.WokenAt = apiSessionData.EndpointState.WokenAt
+		}
+
 		now := time.Now().UTC()
 		ret.ActualValue.PassedOnUnlock = p.PassedOnUnlock(apiSessionData, now)
 		ret.ActualValue.PassedOnWake = p.PassedOnWake(apiSessionData, now)
@@ -284,9 +325,18 @@ type PostureCheckMfaValues struct {
 	IgnoreLegacyEndpoints bool
 }
 
+type PostureCheckMfaCriteria struct {
+	PassedMfaAt             *time.Time
+	WokenAt                 *time.Time
+	UnlockedAt              *time.Time
+	TimeoutSeconds          int64
+	TimeoutRemainingSeconds int64
+}
+
 type PostureCheckFailureValuesMfa struct {
 	ActualValue   PostureCheckMfaValues
 	ExpectedValue PostureCheckMfaValues
+	Criteria      PostureCheckMfaCriteria
 }
 
 func (p PostureCheckFailureValuesMfa) Expected() interface{} {

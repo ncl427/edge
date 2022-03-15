@@ -7,9 +7,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"github.com/openziti/channel"
 	"github.com/openziti/edge/eid"
 	"github.com/openziti/edge/router/internal/edgerouter"
-	"github.com/openziti/foundation/channel2"
 	"github.com/openziti/foundation/identity/identity"
 	"github.com/openziti/foundation/util/concurrenz"
 	"github.com/openziti/foundation/util/tlz"
@@ -27,10 +27,10 @@ func Test_CertExpirationChecker(t *testing.T) {
 			certChecker := newCertChecker()
 
 			now := time.Now()
-			notAfter := now.AddDate(0, 0, 30).Add(30 * time.Second) //30d 30s out
+			notAfter := now.Add(30 * time.Hour * 24).Add(30 * time.Second)
 
-			minWaitTime := 23 * 24 * time.Hour              // 23 days out i.e. 1 week before 30 days
-			maxWaitTime := 23*24*time.Hour + 30*time.Second // 23 days + 30s out i.e. 1 week before 30 days
+			minWaitTime := 23 * 24 * time.Hour          // 23 days out i.e. 1 week before 30 days
+			maxWaitTime := minWaitTime + 30*time.Second // 23 days + 30s out i.e. 1 week before 30 days
 
 			certChecker.id.Cert().Leaf.NotAfter = notAfter
 			certChecker.id.ServerCert().Leaf.NotAfter = notAfter
@@ -159,8 +159,8 @@ func Test_CertExpirationChecker(t *testing.T) {
 			certChecker := newCertChecker()
 
 			now := time.Now()
-			serverNotAfter := now.AddDate(0, 0, 30)
-			clientNotAfter := now.AddDate(0, 0, 25).Add(30 * time.Second)
+			serverNotAfter := now.Add(30 * time.Hour * 24)
+			clientNotAfter := now.Add(25 * time.Hour * 24).Add(30 * time.Second)
 
 			certChecker.id.Cert().Leaf.NotAfter = clientNotAfter
 			certChecker.id.ServerCert().Leaf.NotAfter = serverNotAfter
@@ -222,7 +222,7 @@ func Test_CertExpirationChecker(t *testing.T) {
 			certChecker := newCertChecker()
 
 			now := time.Now()
-			notAfter := now.AddDate(0, 0, 7).Add(30 * time.Second)
+			notAfter := now.Add(7 * 24 * time.Hour).Add(30 * time.Second)
 
 			certChecker.id.ServerCert().Leaf.NotAfter = notAfter
 
@@ -259,8 +259,8 @@ func Test_CertExpirationChecker(t *testing.T) {
 			extender := &stubExtender{
 				done: func() error {
 					invoked = true
-					certChecker.id.Cert().Leaf.NotAfter = time.Now().AddDate(1,0,0)
-					certChecker.id.ServerCert().Leaf.NotAfter = time.Now().AddDate(1,0,0)
+					certChecker.id.Cert().Leaf.NotAfter = time.Now().AddDate(1, 0, 0)
+					certChecker.id.ServerCert().Leaf.NotAfter = time.Now().AddDate(1, 0, 0)
 					return errors.New("test")
 				},
 			}
@@ -536,6 +536,16 @@ type simpleTestChannel struct {
 	isClosed bool
 }
 
+func (ch *simpleTestChannel) Send(s channel.Sendable) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (ch *simpleTestChannel) Underlay() channel.Underlay {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (ch *simpleTestChannel) StartRx() {
 }
 
@@ -563,88 +573,6 @@ func (ch *simpleTestChannel) SetLogicalName(string) {
 	panic("implement SetLogicalName")
 }
 
-func (ch *simpleTestChannel) Bind(channel2.BindHandler) error {
-	panic("implement Bind")
-}
-
-func (ch *simpleTestChannel) AddPeekHandler(channel2.PeekHandler) {
-	panic("implement AddPeekHandler")
-}
-
-func (ch *simpleTestChannel) AddTransformHandler(channel2.TransformHandler) {
-	panic("implement AddTransformHandler")
-}
-
-func (ch *simpleTestChannel) AddReceiveHandler(channel2.ReceiveHandler) {
-	panic("implement AddReceiveHandler")
-}
-
-func (ch *simpleTestChannel) AddErrorHandler(channel2.ErrorHandler) {
-	panic("implement me")
-}
-
-func (ch *simpleTestChannel) AddCloseHandler(channel2.CloseHandler) {
-	panic("implement AddErrorHandler")
-}
-
-func (ch *simpleTestChannel) SetUserData(interface{}) {
-	panic("implement SetUserData")
-}
-
-func (ch *simpleTestChannel) GetUserData() interface{} {
-	panic("implement GetUserData")
-}
-
-func (ch *simpleTestChannel) Send(*channel2.Message) error {
-	return nil
-}
-
-func (ch *simpleTestChannel) SendWithPriority(*channel2.Message, channel2.Priority) error {
-	return nil
-}
-
-func (ch *simpleTestChannel) SendAndSync(m *channel2.Message) (chan error, error) {
-	return ch.SendAndSyncWithPriority(m, channel2.Standard)
-}
-
-func (ch *simpleTestChannel) SendAndSyncWithPriority(*channel2.Message, channel2.Priority) (chan error, error) {
-	result := make(chan error, 1)
-	result <- nil
-	return result, nil
-}
-
-func (ch *simpleTestChannel) SendWithTimeout(*channel2.Message, time.Duration) error {
-	return nil
-}
-
-func (ch *simpleTestChannel) SendPrioritizedWithTimeout(*channel2.Message, channel2.Priority, time.Duration) error {
-	return nil
-}
-
-func (ch *simpleTestChannel) SendAndWaitWithTimeout(*channel2.Message, time.Duration) (*channel2.Message, error) {
-	panic("implement SendAndWaitWithTimeout")
-}
-
-func (ch *simpleTestChannel) SendPrioritizedAndWaitWithTimeout(*channel2.Message, channel2.Priority, time.Duration) (*channel2.Message, error) {
-	panic("implement SendPrioritizedAndWaitWithTimeout")
-}
-
-func (ch *simpleTestChannel) SendAndWait(*channel2.Message) (chan *channel2.Message, error) {
-	panic("implement SendAndWait")
-}
-
-func (ch *simpleTestChannel) SendAndWaitWithPriority(*channel2.Message, channel2.Priority) (chan *channel2.Message, error) {
-	panic("implement SendAndWaitWithPriority")
-}
-
-func (ch *simpleTestChannel) SendForReply(channel2.TypedMessage, time.Duration) (*channel2.Message, error) {
-	panic("implement SendForReply")
-}
-
-func (ch *simpleTestChannel) SendForReplyAndDecode(channel2.TypedMessage, time.Duration, channel2.TypedMessage) error {
-	return nil
-}
-
 func (ch *simpleTestChannel) Close() error {
 	panic("implement Close")
 }
@@ -653,17 +581,13 @@ func (ch *simpleTestChannel) IsClosed() bool {
 	return ch.isClosed
 }
 
-func (ch *simpleTestChannel) Underlay() channel2.Underlay {
-	panic("implement Underlay")
-}
-
 func (ch *simpleTestChannel) GetTimeSinceLastRead() time.Duration {
 	return 0
 }
 
 type stubExtender struct {
 	isRequesting concurrenz.AtomicBoolean
-	done func() error
+	done         func() error
 }
 
 func (s stubExtender) IsRequestingCompareAndSwap(expected bool, value bool) bool {
