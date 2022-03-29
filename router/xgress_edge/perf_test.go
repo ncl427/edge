@@ -37,6 +37,10 @@ type mirrorLink struct {
 	acks chan *xgress.Acknowledgement
 }
 
+func (link *mirrorLink) Inspect() map[string]interface{} {
+	return nil
+}
+
 func (link *mirrorLink) CloseNotified() error {
 	return nil
 }
@@ -45,8 +49,8 @@ func (link *mirrorLink) DestVersion() string {
 	return "0.0.0"
 }
 
-func (link *mirrorLink) LinkType() string {
-	return "test"
+func (link *mirrorLink) LinkProtocol() string {
+	return "tls"
 }
 
 func (link *mirrorLink) HandleCloseNotification(f func()) {

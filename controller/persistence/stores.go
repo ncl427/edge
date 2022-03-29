@@ -38,7 +38,9 @@ type Stores struct {
 
 	ApiSession              ApiSessionStore
 	ApiSessionCertificate   ApiSessionCertificateStore
+	AuthPolicy              AuthPolicyStore
 	EventualEvent           EventualEventStore
+	ExternalJwtSigner       ExternalJwtSignerStore
 	Ca                      CaStore
 	Config                  ConfigStore
 	ConfigType              ConfigTypeStore
@@ -141,6 +143,7 @@ type stores struct {
 	Terminator db.TerminatorStore
 
 	apiSession              *apiSessionStoreImpl
+	authPolicy              *AuthPolicyStoreImpl
 	eventualEvent           *eventualEventStoreImpl
 	ca                      *caStoreImpl
 	config                  *configStoreImpl
@@ -149,6 +152,7 @@ type stores struct {
 	edgeRouterPolicy        *edgeRouterPolicyStoreImpl
 	edgeService             *edgeServiceStoreImpl
 	eventLog                *eventLogStoreImpl
+	externalJwtSigner       *externalJwtSignerStoreImpl
 	geoRegion               *geoRegionStoreImpl
 	identity                *identityStoreImpl
 	identityType            *IdentityTypeStoreImpl
@@ -180,6 +184,7 @@ func NewBoltStores(dbProvider DbProvider) (*Stores, error) {
 	internalStores.apiSession = newApiSessionStore(internalStores)
 	internalStores.apiSessionCertificate = newApiSessionCertificateStore(internalStores)
 	internalStores.authenticator = newAuthenticatorStore(internalStores)
+	internalStores.authPolicy = newAuthPolicyStore(internalStores)
 	internalStores.ca = newCaStore(internalStores)
 	internalStores.config = newConfigsStore(internalStores)
 	internalStores.configType = newConfigTypesStore(internalStores)
@@ -187,6 +192,7 @@ func NewBoltStores(dbProvider DbProvider) (*Stores, error) {
 	internalStores.edgeRouterPolicy = newEdgeRouterPolicyStore(internalStores)
 	internalStores.edgeService = newEdgeServiceStore(internalStores)
 	internalStores.eventLog = newEventLogStore(internalStores)
+	internalStores.externalJwtSigner = newExternalJwtSignerStore(internalStores)
 	internalStores.transitRouter = newTransitRouterStore(internalStores)
 	internalStores.geoRegion = newGeoRegionStore(internalStores)
 	internalStores.identity = newIdentityStore(internalStores)
@@ -208,6 +214,7 @@ func NewBoltStores(dbProvider DbProvider) (*Stores, error) {
 
 		ApiSession:              internalStores.apiSession,
 		ApiSessionCertificate:   internalStores.apiSessionCertificate,
+		AuthPolicy:              internalStores.authPolicy,
 		EventualEvent:           internalStores.eventualEvent,
 		Ca:                      internalStores.ca,
 		Config:                  internalStores.config,
@@ -216,6 +223,7 @@ func NewBoltStores(dbProvider DbProvider) (*Stores, error) {
 		EdgeRouterPolicy:        internalStores.edgeRouterPolicy,
 		EdgeService:             internalStores.edgeService,
 		EventLog:                internalStores.eventLog,
+		ExternalJwtSigner:       internalStores.externalJwtSigner,
 		TransitRouter:           internalStores.transitRouter,
 		GeoRegion:               internalStores.geoRegion,
 		Identity:                internalStores.identity,

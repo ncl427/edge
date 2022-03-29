@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
 	"reflect"
+	"time"
 )
 
 type EnvInfo struct {
@@ -58,6 +59,11 @@ type Identity struct {
 	ServiceHostingPrecedences map[string]ziti.Precedence
 	ServiceHostingCosts       map[string]uint16
 	AppData                   map[string]interface{}
+	AuthPolicyId              string
+	ExternalId                *string
+	Disabled                  bool
+	DisabledAt                *time.Time
+	DisabledUntil             *time.Time
 }
 
 func (entity *Identity) toBoltEntityForCreate(_ *bbolt.Tx, _ Handler) (boltz.Entity, error) {
@@ -65,6 +71,7 @@ func (entity *Identity) toBoltEntityForCreate(_ *bbolt.Tx, _ Handler) (boltz.Ent
 		BaseExtEntity:             *boltz.NewExtEntity(entity.Id, entity.Tags),
 		Name:                      entity.Name,
 		IdentityTypeId:            entity.IdentityTypeId,
+		AuthPolicyId:              entity.AuthPolicyId,
 		IsDefaultAdmin:            entity.IsDefaultAdmin,
 		IsAdmin:                   entity.IsAdmin,
 		RoleAttributes:            entity.RoleAttributes,
@@ -73,6 +80,9 @@ func (entity *Identity) toBoltEntityForCreate(_ *bbolt.Tx, _ Handler) (boltz.Ent
 		ServiceHostingPrecedences: entity.ServiceHostingPrecedences,
 		ServiceHostingCosts:       entity.ServiceHostingCosts,
 		AppData:                   entity.AppData,
+		ExternalId:                entity.ExternalId,
+		DisabledAt:                entity.DisabledAt,
+		DisabledUntil:             entity.DisabledUntil,
 	}
 
 	if entity.EnvInfo != nil {
@@ -155,6 +165,7 @@ func (entity *Identity) toBoltEntityForChange(tx *bbolt.Tx, handler Handler, che
 	boltEntity := &persistence.Identity{
 		Name:                      entity.Name,
 		IdentityTypeId:            entity.IdentityTypeId,
+		AuthPolicyId:              entity.AuthPolicyId,
 		BaseExtEntity:             *boltz.NewExtEntity(entity.Id, entity.Tags),
 		RoleAttributes:            entity.RoleAttributes,
 		DefaultHostingPrecedence:  entity.DefaultHostingPrecedence,
@@ -162,6 +173,9 @@ func (entity *Identity) toBoltEntityForChange(tx *bbolt.Tx, handler Handler, che
 		ServiceHostingPrecedences: entity.ServiceHostingPrecedences,
 		ServiceHostingCosts:       entity.ServiceHostingCosts,
 		AppData:                   entity.AppData,
+		ExternalId:                entity.ExternalId,
+		DisabledAt:                entity.DisabledAt,
+		DisabledUntil:             entity.DisabledUntil,
 	}
 
 	_, currentType := handler.GetStore().GetSymbol(persistence.FieldIdentityType).Eval(tx, []byte(entity.Id))
@@ -194,6 +208,7 @@ func (entity *Identity) fillFrom(handler Handler, tx *bbolt.Tx, boltEntity boltz
 	entity.FillCommon(boltIdentity)
 	entity.Name = boltIdentity.Name
 	entity.IdentityTypeId = boltIdentity.IdentityTypeId
+	entity.AuthPolicyId = boltIdentity.AuthPolicyId
 	entity.IsDefaultAdmin = boltIdentity.IsDefaultAdmin
 	entity.IsAdmin = boltIdentity.IsAdmin
 	entity.RoleAttributes = boltIdentity.RoleAttributes
@@ -203,6 +218,10 @@ func (entity *Identity) fillFrom(handler Handler, tx *bbolt.Tx, boltEntity boltz
 	entity.ServiceHostingPrecedences = boltIdentity.ServiceHostingPrecedences
 	entity.ServiceHostingCosts = boltIdentity.ServiceHostingCosts
 	entity.AppData = boltIdentity.AppData
+	entity.ExternalId = boltIdentity.ExternalId
+	entity.DisabledUntil = boltIdentity.DisabledUntil
+	entity.DisabledAt = boltIdentity.DisabledAt
+	entity.Disabled = boltIdentity.Disabled
 	fillModelInfo(entity, boltIdentity.EnvInfo, boltIdentity.SdkInfo)
 
 	return nil

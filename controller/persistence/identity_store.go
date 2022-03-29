@@ -26,6 +26,8 @@ import (
 	"github.com/openziti/sdk-golang/ziti"
 	"github.com/pkg/errors"
 	"go.etcd.io/bbolt"
+	"strings"
+	"time"
 )
 
 const (
@@ -54,6 +56,10 @@ const (
 	FieldIdentityServiceHostingPrecedences = "serviceHostingPrecedences"
 	FieldIdentityServiceHostingCosts       = "serviceHostingCosts"
 	FieldIdentityAppData                   = "appData"
+	FieldIdentityAuthPolicyId              = "authPolicyId"
+	FieldIdentityExternalId                = "externalId"
+	FieldIdentityDisabledAt                = "disabledAt"
+	FieldIdentityDisabledUntil             = "disabledUntil"
 )
 
 func newIdentity(name string, identityTypeId string, roleAttributes ...string) *Identity {
@@ -97,6 +103,11 @@ type Identity struct {
 	ServiceHostingPrecedences map[string]ziti.Precedence
 	ServiceHostingCosts       map[string]uint16
 	AppData                   map[string]interface{}
+	AuthPolicyId              string
+	ExternalId                *string
+	DisabledAt                *time.Time
+	DisabledUntil             *time.Time
+	Disabled                  bool
 }
 
 type ServiceConfig struct {
@@ -110,6 +121,7 @@ func (entity *Identity) LoadValues(_ boltz.CrudStore, bucket *boltz.TypedBucket)
 	entity.LoadBaseValues(bucket)
 	entity.Name = bucket.GetStringOrError(FieldName)
 	entity.IdentityTypeId = bucket.GetStringWithDefault(FieldIdentityType, "")
+	entity.AuthPolicyId = bucket.GetStringWithDefault(FieldIdentityAuthPolicyId, DefaultAuthPolicyId)
 	entity.IsDefaultAdmin = bucket.GetBoolWithDefault(FieldIdentityIsDefaultAdmin, false)
 	entity.IsAdmin = bucket.GetBoolWithDefault(FieldIdentityIsAdmin, false)
 	entity.Authenticators = bucket.GetStringList(FieldIdentityAuthenticators)
@@ -118,6 +130,17 @@ func (entity *Identity) LoadValues(_ boltz.CrudStore, bucket *boltz.TypedBucket)
 	entity.DefaultHostingPrecedence = ziti.Precedence(bucket.GetInt32WithDefault(FieldIdentityDefaultHostingPrecedence, 0))
 	entity.DefaultHostingCost = uint16(bucket.GetInt32WithDefault(FieldIdentityDefaultHostingCost, 0))
 	entity.AppData = bucket.GetMap(FieldIdentityAppData)
+	entity.ExternalId = bucket.GetString(FieldIdentityExternalId)
+
+	entity.Disabled = false
+	entity.DisabledAt = bucket.GetTime(FieldIdentityDisabledAt)
+	entity.DisabledUntil = bucket.GetTime(FieldIdentityDisabledUntil)
+
+	if entity.DisabledAt != nil {
+		if entity.DisabledUntil == nil || entity.DisabledUntil.After(time.Now()) {
+			entity.Disabled = true
+		}
+	}
 
 	entity.SdkInfo = &SdkInfo{
 		Branch:     bucket.GetStringWithDefault(FieldIdentitySdkInfoBranch, ""),
@@ -160,11 +183,24 @@ func (entity *Identity) SetValues(ctx *boltz.PersistContext) {
 			ctx.Bucket.SetError(errors.New("cannot change type of router identity"))
 		}
 	}
+	if strings.TrimSpace(entity.AuthPolicyId) == "" {
+		entity.AuthPolicyId = DefaultAuthPolicyId
+	}
+	ctx.SetString(FieldIdentityAuthPolicyId, entity.AuthPolicyId)
 	store.validateRoleAttributes(entity.RoleAttributes, ctx.Bucket)
 	ctx.SetStringList(FieldRoleAttributes, entity.RoleAttributes)
 	ctx.SetInt32(FieldIdentityDefaultHostingPrecedence, int32(entity.DefaultHostingPrecedence))
 	ctx.SetInt32(FieldIdentityDefaultHostingCost, int32(entity.DefaultHostingCost))
 	ctx.Bucket.PutMap(FieldIdentityAppData, entity.AppData, ctx.FieldChecker, false)
+
+	ctx.SetTimeP(FieldIdentityDisabledAt, entity.DisabledAt)
+	ctx.SetTimeP(FieldIdentityDisabledUntil, entity.DisabledUntil)
+
+	//treat empty string and white space like nil
+	if entity.ExternalId != nil && len(strings.TrimSpace(*entity.ExternalId)) == 0 {
+		entity.ExternalId = nil
+	}
+	ctx.SetStringP(FieldIdentityExternalId, entity.ExternalId)
 
 	if entity.EnvInfo != nil {
 		ctx.SetString(FieldIdentityEnvInfoArch, entity.EnvInfo.Arch)
@@ -258,6 +294,7 @@ type identityStoreImpl struct {
 	symbolRoleAttributes boltz.EntitySetSymbol
 	symbolAuthenticators boltz.EntitySetSymbol
 	symbolIdentityTypeId boltz.EntitySymbol
+	symbolAuthPolicyId   boltz.EntitySymbol
 	symbolEnrollments    boltz.EntitySetSymbol
 
 	symbolEdgeRouterPolicies boltz.EntitySetSymbol
@@ -269,6 +306,8 @@ type identityStoreImpl struct {
 	edgeRoutersCollection  boltz.RefCountedLinkCollection
 	bindServicesCollection boltz.RefCountedLinkCollection
 	dialServicesCollection boltz.RefCountedLinkCollection
+	symbolExternalId       boltz.EntitySymbol
+	externalIdIndex        boltz.ReadIndex
 }
 
 func (store *identityStoreImpl) NewStoreEntity() boltz.Entity {
@@ -293,8 +332,13 @@ func (store *identityStoreImpl) initializeLocal() {
 	store.symbolServicePolicies = store.AddFkSetSymbol(EntityTypeServicePolicies, store.stores.servicePolicy)
 	store.symbolEnrollments = store.AddFkSetSymbol(FieldIdentityEnrollments, store.stores.enrollment)
 	store.symbolAuthenticators = store.AddFkSetSymbol(FieldIdentityAuthenticators, store.stores.authenticator)
+	store.symbolExternalId = store.AddSymbol(FieldIdentityExternalId, ast.NodeTypeString)
+	store.externalIdIndex = store.AddNullableUniqueIndex(store.symbolExternalId)
 
 	store.symbolIdentityTypeId = store.AddFkSymbol(FieldIdentityType, store.stores.identityType)
+	store.symbolAuthPolicyId = store.AddFkSymbol(FieldIdentityAuthPolicyId, store.stores.authPolicy)
+
+	store.AddFkConstraint(store.symbolAuthPolicyId, true, boltz.CascadeNone)
 
 	store.AddSymbol(FieldIdentityIsAdmin, ast.NodeTypeBool)
 	store.AddSymbol(FieldIdentityIsDefaultAdmin, ast.NodeTypeBool)
