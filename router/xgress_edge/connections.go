@@ -78,8 +78,8 @@ func (handler *sessionConnectionHandler) BindChannel(binding channel.Binding) er
 			return fmt.Errorf("no api session found for token [%s], fingerprints: [%v], subjects [%v]", token, fingerprints, subjects)
 		}
 
-		for _, fingerprint := range apiSession.CertFingerprints {
-			if fingerprints.Contains(fingerprint) {
+		// for _, fingerprint := range apiSession.CertFingerprints {
+			// if fingerprints.Contains(fingerprint) {
 				removeListener := handler.stateManager.AddApiSessionRemovedListener(token, func(token string) {
 					if !ch.IsClosed() {
 						if err := ch.Close(); err != nil {
@@ -91,8 +91,8 @@ func (handler *sessionConnectionHandler) BindChannel(binding channel.Binding) er
 				handler.stateManager.AddConnectedApiSessionWithChannel(token, removeListener, ch)
 
 				return nil
-			}
-		}
+			// }
+		// }
 		_ = ch.Close()
 		return errors.New("invalid client certificate for api session")
 	}

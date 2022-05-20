@@ -36,7 +36,7 @@ require (
 	github.com/openziti/foundation v0.17.25
 	github.com/openziti/sdk-golang v0.16.68
 	github.com/openziti/storage v0.1.5
-	github.com/openziti/transport/v2 v2.0.1
+	github.com/openziti/transport/v2 v2.0.2-0.20220520191948-57b0616a395a
 	github.com/orcaman/concurrent-map v0.0.0-20210106121528-16402b402231
 	github.com/pkg/errors v0.9.1
 	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0
