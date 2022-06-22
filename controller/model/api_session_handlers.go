@@ -31,7 +31,7 @@ import (
 
 func NewApiSessionHandler(env Env) *ApiSessionHandler {
 	handler := &ApiSessionHandler{
-		baseHandler: newBaseHandler(env, env.GetStores().ApiSession),
+		baseEntityManager: newBaseEntityManager(env, env.GetStores().ApiSession),
 	}
 
 	handler.HeartbeatCollector = NewHeartbeatCollector(env, env.GetConfig().Api.ActivityUpdateBatchSize, env.GetConfig().Api.ActivityUpdateInterval, handler.heartbeatFlush)
@@ -42,7 +42,7 @@ func NewApiSessionHandler(env Env) *ApiSessionHandler {
 }
 
 type ApiSessionHandler struct {
-	baseHandler
+	baseEntityManager
 	HeartbeatCollector *HeartbeatCollector
 }
 
@@ -50,15 +50,35 @@ func (handler *ApiSessionHandler) newModelEntity() boltEntitySink {
 	return &ApiSession{}
 }
 
-func (handler *ApiSessionHandler) Create(entity *ApiSession) (string, error) {
+func (handler *ApiSessionHandler) Create(entity *ApiSession, sessionCerts []*ApiSessionCertificate) (string, error) {
 	entity.Id = cuid.New() //use cuids which are longer than shortids but are monotonic
-	id, err := handler.createEntity(entity)
+
+	var apiSessionId string
+	err := handler.env.GetDbProvider().GetDb().Update(func(tx *bbolt.Tx) error {
+		var err error
+		ctx := boltz.NewMutateContext(tx)
+		apiSessionId, err = handler.createEntityInTx(ctx, entity)
+
+		if err != nil {
+			return err
+		}
+
+		for _, sessionCert := range sessionCerts {
+			sessionCert.ApiSessionId = apiSessionId
+			_, err := handler.env.GetManagers().ApiSessionCertificate.createEntityInTx(ctx, sessionCert)
+
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 
 	if err != nil {
-		handler.MarkActivityById(id)
+		handler.MarkActivityById(apiSessionId)
 	}
 
-	return id, err
+	return apiSessionId, err
 }
 
 func (handler *ApiSessionHandler) Read(id string) (*ApiSession, error) {
@@ -132,7 +152,7 @@ func (handler *ApiSessionHandler) MarkActivityByTokens(tokens ...string) ([]stri
 				}
 			}
 			handler.HeartbeatCollector.Mark(apiSession.Id)
-			handler.env.GetHandlers().Identity.SetActive(apiSession.IdentityId)
+			handler.env.GetManagers().Identity.SetActive(apiSession.IdentityId)
 		}
 		return nil
 	})
@@ -225,11 +245,11 @@ func (handler *ApiSessionHandler) VisitFingerprintsForApiSessionId(apiSessionId 
 }
 
 func (handler *ApiSessionHandler) VisitFingerprintsForApiSession(tx *bbolt.Tx, identityId, apiSessionId string, visitor func(fingerprint string) bool) error {
-	if stopVisiting, err := handler.env.GetHandlers().Identity.VisitIdentityAuthenticatorFingerprints(tx, identityId, visitor); stopVisiting || err != nil {
+	if stopVisiting, err := handler.env.GetManagers().Identity.VisitIdentityAuthenticatorFingerprints(tx, identityId, visitor); stopVisiting || err != nil {
 		return err
 	}
 
-	apiSessionCerts, err := handler.env.GetHandlers().ApiSessionCertificate.ReadByApiSessionId(tx, apiSessionId)
+	apiSessionCerts, err := handler.env.GetManagers().ApiSessionCertificate.ReadByApiSessionId(tx, apiSessionId)
 	if err != nil {
 		return err
 	}

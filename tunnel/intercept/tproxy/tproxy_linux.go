@@ -31,7 +31,7 @@ import (
 	"github.com/openziti/foundation/util/mempool"
 	"github.com/openziti/foundation/util/stringz"
 	"github.com/openziti/sdk-golang/ziti/edge/impl"
-	cmap "github.com/orcaman/concurrent-map"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
@@ -76,7 +76,7 @@ func New(lanIf string) (intercept.Interceptor, error) {
 
 	return &interceptor{
 		lanIf:          lanIf,
-		serviceProxies: cmap.New(),
+		serviceProxies: cmap.New[*tProxy](),
 		ipt:            ipt,
 	}, nil
 }
@@ -91,19 +91,13 @@ func (a alwaysRemoveAddressTracker) RemoveAddress(string) bool {
 
 type interceptor struct {
 	lanIf          string
-	provider       tunnel.FabricProvider
-	serviceProxies cmap.ConcurrentMap
+	serviceProxies cmap.ConcurrentMap[*tProxy]
 	ipt            *iptables.IPTables
-}
-
-func (self *interceptor) Start(provider tunnel.FabricProvider) {
-	self.provider = provider
 }
 
 func (self *interceptor) Stop() {
 	servicesRemoved := false
-	self.serviceProxies.IterCb(func(key string, v interface{}) {
-		proxy := v.(*tProxy)
+	self.serviceProxies.IterCb(func(key string, proxy *tProxy) {
 		proxy.Stop(alwaysRemoveAddressTracker{})
 		servicesRemoved = true
 	})
@@ -124,8 +118,7 @@ func (self *interceptor) Intercept(service *entities.Service, resolver dns.Resol
 }
 
 func (self *interceptor) StopIntercepting(serviceName string, tracker intercept.AddressTracker) error {
-	if val, found := self.serviceProxies.Get(serviceName); found {
-		proxy := val.(*tProxy)
+	if proxy, found := self.serviceProxies.Get(serviceName); found {
 		proxy.Stop(tracker)
 		self.serviceProxies.Remove(serviceName)
 		self.cleanupChains()
@@ -200,11 +193,11 @@ func (self *interceptor) newTproxy(service *entities.Service, resolver dns.Resol
 	}
 
 	if t.tcpLn != nil {
-		go t.acceptTCP(self.provider)
+		go t.acceptTCP()
 	}
 
 	if t.udpLn != nil {
-		go t.acceptUDP(self.provider)
+		go t.acceptUDP()
 	}
 
 	return t, t.Intercept(resolver, tracker)
@@ -249,7 +242,7 @@ const (
 	dstChain    = "NF-INTERCEPT"
 )
 
-func (self *tProxy) acceptTCP(provider tunnel.FabricProvider) {
+func (self *tProxy) acceptTCP() {
 	log := pfxlog.Logger()
 	for {
 		client, err := self.tcpLn.Accept()
@@ -266,12 +259,12 @@ func (self *tProxy) acceptTCP(provider tunnel.FabricProvider) {
 		sourceAddr := self.service.GetSourceAddr(client.RemoteAddr(), client.LocalAddr())
 		appInfo := tunnel.GetAppInfo("tcp", dstHostname, dstIp, dstPort, sourceAddr)
 		identity := self.service.GetDialIdentity(client.RemoteAddr(), client.LocalAddr())
-		go tunnel.DialAndRun(provider, self.service, identity, client, appInfo, true)
+		go tunnel.DialAndRun(self.service, identity, client, appInfo, true)
 	}
 }
 
-func (self *tProxy) acceptUDP(provider tunnel.FabricProvider) {
-	vconnMgr := udp_vconn.NewManager(provider, udp_vconn.NewUnlimitedConnectionPolicy(), udp_vconn.NewDefaultExpirationPolicy())
+func (self *tProxy) acceptUDP() {
+	vconnMgr := udp_vconn.NewManager(self.service.GetFabricProvider(), udp_vconn.NewUnlimitedConnectionPolicy(), udp_vconn.NewDefaultExpirationPolicy())
 	self.generateReadEvents(vconnMgr)
 }
 
@@ -317,16 +310,19 @@ func (event *udpReadEvent) Handle(manager udp_vconn.Manager) error {
 		log := pfxlog.Logger()
 		origDest, err := getOriginalDest(event.oob)
 		if err != nil {
+			event.buf.Release()
 			return fmt.Errorf("error while getting original destination packet: %v", err)
 		}
 		log.Infof("received datagram from %v (original dest %v). Creating udp listen socket on original dest", event.srcAddr, origDest)
 		packetConn, err := listenConfig.ListenPacket(context.Background(), "udp", origDest.String())
 		if err != nil {
+			event.buf.Release()
 			return err
 		}
 		writeConn := packetConn.(*net.UDPConn)
 		writeQueue, err = manager.CreateWriteQueue(origDest, event.srcAddr, event.interceptor.service, writeConn)
 		if err != nil {
+			event.buf.Release()
 			return err
 		}
 	}

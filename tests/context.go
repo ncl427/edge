@@ -285,7 +285,7 @@ func (ctx *TestContext) NewClientComponentsWithClientCert(cert *x509.Certificate
 	httpClient := ctx.NewHttpClient(clientTransport)
 	client := resty.NewWithClient(httpClient)
 
-	client.SetHostURL("https://" + ctx.ApiHost)
+	client.SetHostURL("https://" + ctx.ApiHost + EdgeClientApiPath)
 
 	return client, httpClient, clientTransport
 
@@ -336,7 +336,7 @@ func (ctx *TestContext) StartServerFor(test string, clean bool) {
 
 	ctx.EdgeController.Initialize()
 
-	err = ctx.EdgeController.AppEnv.Handlers.Identity.InitializeDefaultAdmin(ctx.AdminAuthenticator.Username, ctx.AdminAuthenticator.Password, eid.New())
+	err = ctx.EdgeController.AppEnv.Managers.Identity.InitializeDefaultAdmin(ctx.AdminAuthenticator.Username, ctx.AdminAuthenticator.Password, eid.New())
 	if err != nil {
 		log.WithError(err).Warn("error during initialize admin")
 	}
@@ -577,7 +577,7 @@ func (ctx *TestContext) completeOttCaEnrollment(certAuth *certAuthenticator) {
 		},
 	}
 	client := resty.NewWithClient(ctx.NewHttpClient(trans))
-	client.SetHostURL("https://" + ctx.ApiHost)
+	client.SetHostURL("https://" + ctx.ApiHost + EdgeClientApiPath)
 
 	resp, err := client.NewRequest().
 		SetBody("{}").
@@ -597,7 +597,7 @@ func (ctx *TestContext) completeCaAutoEnrollmentWithName(certAuth *certAuthentic
 		},
 	}
 	client := resty.NewWithClient(ctx.NewHttpClient(trans))
-	client.SetHostURL("https://" + ctx.ApiHost)
+	client.SetHostURL("https://" + ctx.ApiHost + EdgeClientApiPath)
 
 	body := gabs.New()
 	_, _ = body.SetP(name, "name")

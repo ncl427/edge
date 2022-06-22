@@ -5478,6 +5478,11 @@ paths:
               meta:
                 apiEnrollmentVersion: 0.0.1
                 apiVersion: 0.0.1
+        "409":
+          description: The request could not be completed due to a conflict of configuration
+            or state
+          schema:
+            $ref: '#/definitions/apiErrorEnvelope'
   /enrollments/{id}:
     get:
       security:
@@ -6274,7 +6279,7 @@ paths:
       operationId: detailIdentity
       responses:
         "200":
-          description: A signle identity
+          description: A single identity
           schema:
             $ref: '#/definitions/detailIdentityEnvelope'
         "401":
@@ -6580,10 +6585,10 @@ paths:
       security:
       - ztSession: []
       description: |
-        Returns a list of authenticators associated to the idetity specified
+        Returns a list of authenticators associated to the identity specified
       tags:
       - Identity
-      summary: Retrieve the curent authenticators of a specific identity
+      summary: Retrieve the current authenticators of a specific identity
       operationId: getIdentityAuthenticators
       responses:
         "200":
@@ -6829,6 +6834,64 @@ paths:
           description: Base empty response
           schema:
             $ref: '#/definitions/empty'
+        "401":
+          description: The currently supplied session does not have the correct access
+            rights to request this resource
+          schema:
+            $ref: '#/definitions/apiErrorEnvelope'
+          examples:
+            application/json:
+              error:
+                args:
+                  urlVars: {}
+                cause: ""
+                causeMessage: ""
+                code: UNAUTHORIZED
+                message: The request could not be completed. The session is not authorized
+                  or the credentials are invalid
+                requestId: 0bfe7a04-9229-4b7a-812c-9eb3cc0eac0f
+              meta:
+                apiEnrollmentVersion: 0.0.1
+                apiVersion: 0.0.1
+        "404":
+          description: The requested resource does not exist
+          schema:
+            $ref: '#/definitions/apiErrorEnvelope'
+          examples:
+            application/json:
+              error:
+                args:
+                  urlVars:
+                    id: 71a3000f-7dda-491a-9b90-a19f4ee6c406
+                cause: null
+                causeMessage: ""
+                code: NOT_FOUND
+                message: The resource requested was not found or is no longer available
+                requestId: 270908d6-f2ef-4577-b973-67bec18ae376
+              meta:
+                apiEnrollmentVersion: 0.0.1
+                apiVersion: 0.0.1
+    parameters:
+    - type: string
+      description: The id of the requested resource
+      name: id
+      in: path
+      required: true
+  /identities/{id}/enrollments:
+    get:
+      security:
+      - ztSession: []
+      description: |
+        Returns a list of enrollments associated to the identity specified
+      tags:
+      - Identity
+      summary: Retrieve the current enrollments of a specific identity
+      operationId: getIdentityEnrollments
+      responses:
+        "200":
+          description: A list of enrollments
+          schema:
+            $ref: '#/definitions/listEnrollmentsEnvelope'
         "401":
           description: The currently supplied session does not have the correct access
             rights to request this resource
@@ -12809,6 +12872,8 @@ definitions:
           kllz/+ZvmdBp9iedV5o5BvJUggACMCv+UBFlJH7pmsOCo/F45Kk178YsCC7gaMxE
           1ZG1zveyMvsYsH04C9FndE6w2MLvlA==
           -----END CERTIFICATE-----
+      externalIdClaim:
+        $ref: '#/definitions/externalIdClaim'
       identityNameFormat:
         type: string
       identityRoles:
@@ -12846,6 +12911,8 @@ definitions:
       properties:
         certPem:
           type: string
+        externalIdClaim:
+          $ref: '#/definitions/externalIdClaim'
         fingerprint:
           type: string
         identityNameFormat:
@@ -12877,6 +12944,8 @@ definitions:
   caPatch:
     type: object
     properties:
+      externalIdClaim:
+        $ref: '#/definitions/externalIdClaimPatch'
       identityNameFormat:
         type: string
         x-nullable: true
@@ -12910,6 +12979,8 @@ definitions:
     - identityRoles
     - identityNameFormat
     properties:
+      externalIdClaim:
+        $ref: '#/definitions/externalIdClaim'
       identityNameFormat:
         type: string
       identityRoles:
@@ -13809,10 +13880,6 @@ definitions:
         caId:
           type: string
           x-nullable: true
-        details:
-          type: object
-          additionalProperties:
-            type: string
         edgeRouter:
           $ref: '#/definitions/entityRef'
         edgeRouterId:
@@ -13893,20 +13960,94 @@ definitions:
         type: string
       osVersion:
         type: string
+  externalIdClaim:
+    type: object
+    required:
+    - location
+    - matcher
+    - matcherCriteria
+    - parser
+    - parserCriteria
+    - index
+    properties:
+      index:
+        type: integer
+        x-nullable: true
+      location:
+        type: string
+        enum:
+        - COMMON_NAME
+        - SAN_URI
+        - SAN_EMAIL
+        x-nullable: true
+      matcher:
+        type: string
+        enum:
+        - ALL
+        - PREFIX
+        - SUFFIX
+        - SCHEME
+        x-nullable: true
+      matcherCriteria:
+        type: string
+        x-nullable: true
+      parser:
+        type: string
+        enum:
+        - NONE
+        - SPLIT
+        x-nullable: true
+      parserCriteria:
+        type: string
+        x-nullable: true
+  externalIdClaimPatch:
+    type: object
+    properties:
+      index:
+        type: integer
+        x-nullable: true
+      location:
+        type: string
+        enum:
+        - COMMON_NAME
+        - SAN_URI
+        - SAN_EMAIL
+        x-nullable: true
+      matcher:
+        type: string
+        enum:
+        - ALL
+        - PREFIX
+        - SUFFIX
+        - SCHEME
+        x-nullable: true
+      matcherCriteria:
+        type: string
+        x-nullable: true
+      parser:
+        type: string
+        enum:
+        - NONE
+        - SPLIT
+        x-nullable: true
+      parserCriteria:
+        type: string
+        x-nullable: true
   externalJwtSignerCreate:
     description: A create Certificate Authority (CA) object
     type: object
     required:
     - name
-    - certPem
     - enabled
-    - kid
+    - issuer
+    - audience
     properties:
       audience:
         type: string
         x-nullable: true
       certPem:
         type: string
+        x-nullable: true
       claimsProperty:
         type: string
         x-nullable: true
@@ -13918,9 +14059,13 @@ definitions:
         x-nullable: true
       issuer:
         type: string
+      jwksEndpoint:
+        type: string
+        format: uri
         x-nullable: true
       kid:
         type: string
+        x-nullable: true
       name:
         type: string
         example: MyApps Signer
@@ -13938,6 +14083,7 @@ definitions:
       required:
       - name
       - certPem
+      - jwksEndpoint
       - enabled
       - fingerprint
       - commonName
@@ -13954,6 +14100,7 @@ definitions:
           type: string
         certPem:
           type: string
+          x-nullable: true
         claimsProperty:
           type: string
         commonName:
@@ -13967,6 +14114,10 @@ definitions:
           type: string
         issuer:
           type: string
+        jwksEndpoint:
+          type: string
+          format: uri
+          x-nullable: true
         kid:
           type: string
         name:
@@ -14007,6 +14158,10 @@ definitions:
       issuer:
         type: string
         x-nullable: true
+      jwksEndpoint:
+        type: string
+        format: uri
+        x-nullable: true
       kid:
         type: string
         x-nullable: true
@@ -14023,15 +14178,16 @@ definitions:
     type: object
     required:
     - name
-    - certPem
     - enabled
-    - kid
+    - issuer
+    - audience
     properties:
       audience:
         type: string
         x-nullable: true
       certPem:
         type: string
+        x-nullable: true
       claimsProperty:
         type: string
         x-nullable: true
@@ -14043,9 +14199,13 @@ definitions:
         x-nullable: true
       issuer:
         type: string
+      jwksEndpoint:
+        type: string
+        format: uri
         x-nullable: true
       kid:
         type: string
+        x-nullable: true
       name:
         type: string
         example: MyApps Signer
@@ -14209,6 +14369,7 @@ definitions:
           $ref: '#/definitions/envInfo'
         externalId:
           type: string
+          x-nullable: true
         hasApiSession:
           type: boolean
         hasEdgeRouterConnection:

@@ -25,7 +25,7 @@ import (
 	"github.com/openziti/edge/tunnel/intercept/proxy"
 	"github.com/openziti/edge/tunnel/intercept/tproxy"
 	"github.com/openziti/fabric/router/xgress"
-	cmap "github.com/orcaman/concurrent-map"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/pkg/errors"
 	"net"
 	"time"
@@ -40,13 +40,13 @@ type tunneler struct {
 	interceptor    intercept.Interceptor
 	servicePoller  *servicePoller
 	fabricProvider *fabricProvider
-	terminators    cmap.ConcurrentMap
+	terminators    cmap.ConcurrentMap[*tunnelTerminator]
 }
 
 func newTunneler(factory *Factory, stateManager fabric.StateManager) *tunneler {
 	result := &tunneler{
 		stateManager: stateManager,
-		terminators:  cmap.New(),
+		terminators:  cmap.New[*tunnelTerminator](),
 	}
 
 	result.fabricProvider = newProvider(factory, result)
@@ -60,6 +60,9 @@ func (self *tunneler) Start(notifyClose <-chan struct{}) error {
 	defer self.servicePoller.serviceListenerLock.Unlock()
 
 	var err error
+
+	log := pfxlog.Logger()
+	log.WithField("mode", self.listenOptions.mode).Info("creating interceptor")
 
 	if self.listenOptions.mode == "tproxy" {
 		if self.interceptor, err = tproxy.New(self.listenOptions.lanIf); err != nil {
@@ -85,7 +88,6 @@ func (self *tunneler) Start(notifyClose <-chan struct{}) error {
 
 	self.servicePoller.serviceListener = intercept.NewServiceListener(self.interceptor, resolver)
 	self.servicePoller.serviceListener.HandleProviderReady(self.fabricProvider)
-	self.interceptor.Start(self.fabricProvider)
 
 	go self.servicePoller.pollServices(self.listenOptions.svcPollRate, notifyClose)
 	go self.removeStaleConnections(notifyClose)
@@ -101,17 +103,16 @@ func (self *tunneler) removeStaleConnections(notifyClose <-chan struct{}) {
 		select {
 		case <-ticker.C:
 			var toRemove []string
-			self.terminators.IterCb(func(key string, v interface{}) {
-				if t, ok := v.(*tunnelTerminator); ok {
-					if t.closed.Get() {
-						toRemove = append(toRemove, key)
-					}
+			self.terminators.IterCb(func(key string, t *tunnelTerminator) {
+
+				if t.closed.Get() {
+					toRemove = append(toRemove, key)
 				}
+
 			})
 
 			for _, key := range toRemove {
-				if v, found := self.terminators.Get(key); found {
-					t := v.(*tunnelTerminator)
+				if t, found := self.terminators.Get(key); found {
 					self.terminators.Remove(key)
 					pfxlog.Logger().Debugf("removed closed tunnel terminator %v for service %v", key, t.context.ServiceName())
 				}

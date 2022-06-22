@@ -33,7 +33,7 @@ import (
 	"github.com/openziti/foundation/util/concurrenz"
 	"github.com/openziti/sdk-golang/ziti/edge"
 	"github.com/openziti/sdk-golang/ziti/sdkinfo"
-	cmap "github.com/orcaman/concurrent-map"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/sirupsen/logrus"
 	"net"
 	"runtime"
@@ -46,8 +46,8 @@ func newProvider(factory *Factory, tunneler *tunneler) *fabricProvider {
 	return &fabricProvider{
 		factory:      factory,
 		tunneler:     tunneler,
-		dialSessions: cmap.New(),
-		bindSessions: cmap.New(),
+		dialSessions: cmap.New[string](),
+		bindSessions: cmap.New[string](),
 	}
 }
 
@@ -59,24 +59,18 @@ type fabricProvider struct {
 	apiSessionToken string
 	currentIdentity *edge.CurrentIdentity
 
-	dialSessions cmap.ConcurrentMap
-	bindSessions cmap.ConcurrentMap
+	dialSessions cmap.ConcurrentMap[string]
+	bindSessions cmap.ConcurrentMap[string]
 }
 
 func (self *fabricProvider) getDialSession(serviceName string) string {
 	sessionId, _ := self.dialSessions.Get(serviceName)
-	if sessionId != nil {
-		return sessionId.(string)
-	}
-	return ""
+	return sessionId
 }
 
 func (self *fabricProvider) getBindSession(serviceName string) string {
 	sessionId, _ := self.bindSessions.Get(serviceName)
-	if sessionId != nil {
-		return sessionId.(string)
-	}
-	return ""
+	return sessionId
 }
 
 func (self *fabricProvider) updateApiSession(resp *edge_ctrl_pb.CreateApiSessionResponse) {
@@ -274,12 +268,12 @@ func (self *fabricProvider) establishTerminatorWithRetry(terminator *tunnelTermi
 }
 
 func (self *fabricProvider) establishTerminator(terminator *tunnelTerminator) error {
-	terminator.address = uuid.NewString() // grab new id each time we retry
+	address := uuid.NewString() // grab new id each time we retry
 
 	log := pfxlog.Logger().
 		WithField("routerId", self.factory.id).
 		WithField("service", terminator.context.ServiceName()).
-		WithField("address", terminator.address)
+		WithField("address", address)
 
 	keyPair, err := kx.NewKeyPair()
 	if err != nil {
@@ -296,13 +290,13 @@ func (self *fabricProvider) establishTerminator(terminator *tunnelTerminator) er
 		precedence = edge_ctrl_pb.TerminatorPrecedence_Failed
 	}
 
-	self.tunneler.terminators.Set(terminator.address, terminator)
+	self.tunneler.terminators.Set(address, terminator)
 
 	sessionId := self.getBindSession(terminator.context.ServiceName())
 	request := &edge_ctrl_pb.CreateTunnelTerminatorRequest{
 		ServiceName: terminator.context.ServiceName(),
 		SessionId:   sessionId,
-		Address:     terminator.address,
+		Address:     address,
 		PeerData:    hostData,
 		Cost:        uint32(terminator.context.ListenOptions().Cost),
 		Precedence:  precedence,
@@ -326,21 +320,23 @@ func (self *fabricProvider) establishTerminator(terminator *tunnelTerminator) er
 		self.bindSessions.Set(terminator.context.ServiceName(), response.Session.SessionId)
 	}
 
-	terminator.closeCallback = self.tunneler.stateManager.AddEdgeSessionRemovedListener(response.Session.Token, func(token string) {
+	closeCallback := self.tunneler.stateManager.AddEdgeSessionRemovedListener(response.Session.Token, func(token string) {
 		if err := self.removeTerminator(terminator); err != nil {
 			log.WithError(err).Error("failed to remove terminator after edge session was removed")
 		}
 		go self.establishTerminatorWithRetry(terminator)
 	})
 
+	terminator.closeCallback.Store(closeCallback)
+
 	log.WithField("terminatorId", response.TerminatorId).Info("created terminator")
 
-	terminator.terminatorId = response.TerminatorId
+	terminator.terminatorId.Store(response.TerminatorId)
 	return nil
 }
 
 func (self *fabricProvider) removeTerminator(terminator *tunnelTerminator) error {
-	msg := channel.NewMessage(int32(edge_ctrl_pb.ContentType_RemoveTunnelTerminatorRequestType), []byte(terminator.terminatorId))
+	msg := channel.NewMessage(int32(edge_ctrl_pb.ContentType_RemoveTunnelTerminatorRequestType), []byte(terminator.terminatorId.Load()))
 	responseMsg, err := msg.WithTimeout(self.factory.DefaultRequestTimeout()).SendForReply(self.factory.Channel())
 	return xgress_common.CheckForFailureResult(responseMsg, err, edge_ctrl_pb.ContentType_RemoveTunnelTerminatorResponseType)
 }
@@ -411,14 +407,13 @@ func (self *fabricProvider) requestServiceList(lastUpdateToken []byte) {
 type tunnelTerminator struct {
 	provider      *fabricProvider
 	context       tunnel.HostingContext
-	address       string
-	terminatorId  string
-	closeCallback func()
+	terminatorId  concurrenz.AtomicValue[string]
+	closeCallback concurrenz.AtomicValue[func()]
 	closed        concurrenz.AtomicBoolean
 }
 
 func (self *tunnelTerminator) SendHealthEvent(pass bool) error {
-	return self.provider.sendHealthEvent(self.terminatorId, pass)
+	return self.provider.sendHealthEvent(self.terminatorId.Load(), pass)
 }
 
 func (self *tunnelTerminator) Close() error {
@@ -430,8 +425,10 @@ func (self *tunnelTerminator) Close() error {
 		log.Debug("closing tunnel terminator context")
 		self.context.OnClose()
 
-		log.Debug("unregistering session listener for tunnel terminator")
-		self.closeCallback()
+		if cb := self.closeCallback.Load(); cb != nil {
+			log.Debug("unregistering session listener for tunnel terminator")
+			cb()
+		}
 
 		log.Debug("removing tunnel terminator")
 		if err := self.provider.removeTerminator(self); err != nil {
@@ -457,5 +454,5 @@ func (self *tunnelTerminator) UpdateCostAndPrecedence(cost uint16, precedence ed
 }
 
 func (self *tunnelTerminator) updateCostAndPrecedence(cost *uint16, precedence *edge.Precedence) error {
-	return self.provider.updateTerminator(self.terminatorId, cost, precedence)
+	return self.provider.updateTerminator(self.terminatorId.Load(), cost, precedence)
 }

@@ -1,7 +1,7 @@
 // This file is safe to edit. Once it exists it will not be overwritten
 
 //
-// Copyright NetFoundry, Inc.
+// Copyright NetFoundry Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -524,6 +524,11 @@ func configureAPI(api *operations.ZitiEdgeManagementAPI) http.Handler {
 	if api.IdentityGetIdentityAuthenticatorsHandler == nil {
 		api.IdentityGetIdentityAuthenticatorsHandler = identity.GetIdentityAuthenticatorsHandlerFunc(func(params identity.GetIdentityAuthenticatorsParams, principal interface{}) middleware.Responder {
 			return middleware.NotImplemented("operation identity.GetIdentityAuthenticators has not yet been implemented")
+		})
+	}
+	if api.IdentityGetIdentityEnrollmentsHandler == nil {
+		api.IdentityGetIdentityEnrollmentsHandler = identity.GetIdentityEnrollmentsHandlerFunc(func(params identity.GetIdentityEnrollmentsParams, principal interface{}) middleware.Responder {
+			return middleware.NotImplemented("operation identity.GetIdentityEnrollments has not yet been implemented")
 		})
 	}
 	if api.IdentityGetIdentityFailedServiceRequestsHandler == nil {

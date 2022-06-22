@@ -23,7 +23,7 @@ import (
 	"github.com/openziti/edge/controller/apierror"
 	"github.com/openziti/edge/controller/persistence"
 	"github.com/openziti/foundation/util/errorz"
-	cmap "github.com/orcaman/concurrent-map"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"time"
 )
 
@@ -32,14 +32,14 @@ var _ AuthProcessor = &AuthModuleUpdb{}
 type AuthModuleUpdb struct {
 	env                       Env
 	method                    string
-	attemptsByAuthenticatorId cmap.ConcurrentMap //string -> int64
+	attemptsByAuthenticatorId cmap.ConcurrentMap[int64]
 }
 
 func NewAuthModuleUpdb(env Env) *AuthModuleUpdb {
 	handler := &AuthModuleUpdb{
 		env:                       env,
 		method:                    "password",
-		attemptsByAuthenticatorId: cmap.New(),
+		attemptsByAuthenticatorId: cmap.New[int64](),
 	}
 
 	return handler
@@ -49,7 +49,7 @@ func (handler *AuthModuleUpdb) CanHandle(method string) bool {
 	return method == handler.method
 }
 
-func (handler *AuthModuleUpdb) Process(context AuthContext) (string, string, string, error) {
+func (handler *AuthModuleUpdb) Process(context AuthContext) (AuthResult, error) {
 	logger := pfxlog.Logger().WithField("authMethod", handler.method)
 
 	data := context.GetData()
@@ -65,20 +65,20 @@ func (handler *AuthModuleUpdb) Process(context AuthContext) (string, string, str
 	}
 
 	if username == "" || password == "" {
-		return "", "", "", errorz.NewCouldNotValidate(errors.New("username and password fields are required"))
+		return nil, errorz.NewCouldNotValidate(errors.New("username and password fields are required"))
 	}
 
 	logger = logger.WithField("username", username)
-	authenticator, err := handler.env.GetHandlers().Authenticator.ReadByUsername(username)
+	authenticator, err := handler.env.GetManagers().Authenticator.ReadByUsername(username)
 
 	if err != nil {
 		logger.WithError(err).Error("could not authenticate, authenticator lookup by username errored")
-		return "", "", "", err
+		return nil, err
 	}
 
 	if authenticator == nil {
 		logger.WithError(err).Error("could not authenticate, authenticator lookup returned nil")
-		return "", "", "", apierror.NewInvalidAuth()
+		return nil, apierror.NewInvalidAuth()
 	}
 
 	logger = logger.
@@ -89,12 +89,12 @@ func (handler *AuthModuleUpdb) Process(context AuthContext) (string, string, str
 
 	if err != nil {
 		logger.WithError(err).Errorf("could not look up auth policy by identity id")
-		return "", "", "", apierror.NewInvalidAuth()
+		return nil, apierror.NewInvalidAuth()
 	}
 
 	if authPolicy == nil {
 		logger.Error("auth policy look up returned nil")
-		return "", "", "", apierror.NewInvalidAuth()
+		return nil, apierror.NewInvalidAuth()
 	}
 
 	if identity.Disabled {
@@ -102,35 +102,34 @@ func (handler *AuthModuleUpdb) Process(context AuthContext) (string, string, str
 			WithField("disabledAt", identity.DisabledAt).
 			WithField("disabledUntil", identity.DisabledUntil).
 			Error("authentication failed, identity is disabled")
-		return "", "", "", apierror.NewInvalidAuth()
+		return nil, apierror.NewInvalidAuth()
 	}
 
 	logger = logger.WithField("authPolicyId", authPolicy.Id)
 
 	if !authPolicy.Primary.Updb.Allowed {
 		logger.Error("auth policy does not allow updb authentication")
-		return "", "", "", apierror.NewInvalidAuth()
+		return nil, apierror.NewInvalidAuth()
 	}
 
 	attempts := int64(0)
-	handler.attemptsByAuthenticatorId.Upsert(authenticator.Id, nil, func(exist bool, valueInMap interface{}, newValue interface{}) interface{} {
+	handler.attemptsByAuthenticatorId.Upsert(authenticator.Id, 0, func(exist bool, prevAttempts int64, newValue int64) int64 {
 		if exist {
-			prevAttempts := valueInMap.(int64)
 			attempts = prevAttempts + 1
 			return attempts
 		}
 
-		return int64(0)
+		return 0
 	})
 
 	if authPolicy.Primary.Updb.MaxAttempts != persistence.UpdbUnlimitedAttemptsLimit && attempts > authPolicy.Primary.Updb.MaxAttempts {
 		logger.WithField("attempts", attempts).WithField("maxAttempts", authPolicy.Primary.Updb.MaxAttempts).Error("updb auth failed, max attempts exceeded")
 
-		if err = handler.env.GetHandlers().Identity.Disable(authenticator.IdentityId, time.Duration(authPolicy.Primary.Updb.LockoutDurationMinutes)*time.Minute); err != nil {
+		if err = handler.env.GetManagers().Identity.Disable(authenticator.IdentityId, time.Duration(authPolicy.Primary.Updb.LockoutDurationMinutes)*time.Minute); err != nil {
 			logger.WithError(err).Error("could not lock identity, unhandled error")
 		}
 
-		return "", "", "", apierror.NewInvalidAuth()
+		return nil, apierror.NewInvalidAuth()
 	}
 
 	updb := authenticator.ToUpdb()
@@ -138,17 +137,23 @@ func (handler *AuthModuleUpdb) Process(context AuthContext) (string, string, str
 	salt, err := decodeSalt(updb.Salt)
 
 	if err != nil {
-		return "", "", "", apierror.NewInvalidAuth()
+		return nil, apierror.NewInvalidAuth()
 	}
 
-	hr := handler.env.GetHandlers().Authenticator.ReHashPassword(password, salt)
+	hr := handler.env.GetManagers().Authenticator.ReHashPassword(password, salt)
 
 	if updb.Password != hr.Password {
 
-		return "", "", "", apierror.NewInvalidAuth()
+		return nil, apierror.NewInvalidAuth()
 	}
 
-	return updb.IdentityId, "", authenticator.Id, nil
+	return &AuthResultBase{
+		identity:        identity,
+		identityId:      updb.IdentityId,
+		authenticator:   authenticator,
+		authenticatorId: authenticator.IdentityId,
+		env:             handler.env,
+	}, nil
 }
 
 func decodeSalt(s string) ([]byte, error) {

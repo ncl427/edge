@@ -87,13 +87,13 @@ func (handler *PostureResponseHandler) SetMfaPostureForIdentity(identityId strin
 		passedAt = &postureResponse.LastUpdatedAt
 	}
 
-	handler.postureCache.Upsert(identityId, true, func(exist bool, valueInMap interface{}, newValue interface{}) interface{} {
+	handler.postureCache.Upsert(identityId, true, func(exist bool, valueInMap *PostureData, newValue *PostureData) *PostureData {
 		var pd *PostureData
 
 		if exist {
-			pd = valueInMap.(*PostureData)
+			pd = valueInMap
 		} else {
-			pd = newValue.(*PostureData)
+			pd = newValue
 		}
 
 		if pd == nil {
@@ -147,7 +147,7 @@ func (handler *PostureResponseHandler) postureDataUpdated(env Env, identityId st
 		}
 
 		for _, apiSessionId := range apiSessionIds {
-			result, err := handler.env.GetHandlers().Session.Query(fmt.Sprintf(`apiSession = "%v"`, apiSessionId))
+			result, err := handler.env.GetManagers().Session.Query(fmt.Sprintf(`apiSession = "%v"`, apiSessionId))
 
 			if err != nil {
 				return fmt.Errorf("could not query for sessions: %v", err)
@@ -162,7 +162,7 @@ func (handler *PostureResponseHandler) postureDataUpdated(env Env, identityId st
 				//if we have evaluated positive access before, don't do it again
 				if !isEvaluatedService {
 					validServices[session.ServiceId] = false
-					policyPostureChecks := handler.env.GetHandlers().EdgeService.GetPolicyPostureChecks(identityId, session.ServiceId)
+					policyPostureChecks := handler.env.GetManagers().EdgeService.GetPolicyPostureChecks(identityId, session.ServiceId)
 
 					if len(policyPostureChecks) == 0 {
 						isValidService = true
@@ -208,7 +208,7 @@ func (handler *PostureResponseHandler) postureDataUpdated(env Env, identityId st
 
 	for _, sessionId := range sessionIdsToDelete {
 		//todo: delete batch?
-		_ = handler.env.GetHandlers().Session.Delete(sessionId)
+		_ = handler.env.GetManagers().Session.Delete(sessionId)
 	}
 
 }
@@ -232,12 +232,12 @@ func (handler *PostureResponseHandler) SetSdkInfo(identityId, apiSessionId strin
 		return
 	}
 
-	handler.postureCache.Upsert(identityId, false, func(exist bool, valueInMap interface{}, newValue interface{}) interface{} {
+	handler.postureCache.Upsert(identityId, false, func(exist bool, valueInMap *PostureData, newValue *PostureData) *PostureData {
 		var postureData *PostureData
 		if exist {
-			postureData = valueInMap.(*PostureData)
+			postureData = valueInMap
 		} else {
-			postureData = newValue.(*PostureData)
+			postureData = newValue
 		}
 
 		if _, ok := postureData.ApiSessions[apiSessionId]; !ok {
@@ -270,7 +270,6 @@ func shouldPostureCheckTimeoutBeAltered(mfaCheck *persistence.PostureCheckMfa, t
 
 		return timeoutShouldBeAltered
 	}
-
 
 	return false
 }
@@ -319,7 +318,7 @@ func (handler *PostureResponseHandler) GetEndpointStateChangeAffectedServices(ti
 							service, err := handler.env.GetStores().EdgeService.LoadOneById(tx, string(serviceCursor.Current()))
 							if err == nil {
 								modelService := &Service{}
-								if err := modelService.fillFrom(handler.env.GetHandlers().EdgeService, tx, service); err == nil {
+								if err := modelService.fillFrom(handler.env.GetManagers().EdgeService, tx, service); err == nil {
 									//use the lowest configured timeout (which is some timeout or no timeout)
 									if existingService, ok := services[service.Id]; !ok || timeout < existingService.Timeout {
 										services[service.Id] = &ServiceWithTimeout{

@@ -29,6 +29,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lucsky/cuid"
 	"github.com/michaelquigley/pfxlog"
+	"github.com/openziti/channel"
 	edgeConfig "github.com/openziti/edge/controller/config"
 	"github.com/openziti/edge/controller/internal/permissions"
 	"github.com/openziti/edge/controller/model"
@@ -46,14 +47,14 @@ import (
 	"github.com/openziti/fabric/controller/network"
 	"github.com/openziti/fabric/controller/xctrl"
 	"github.com/openziti/fabric/controller/xmgmt"
-	"github.com/openziti/fabric/xweb"
 	"github.com/openziti/foundation/identity/identity"
 	"github.com/openziti/foundation/metrics"
 	"github.com/openziti/foundation/util/errorz"
 	"github.com/openziti/sdk-golang/ziti/config"
 	"github.com/openziti/sdk-golang/ziti/constants"
 	"github.com/openziti/storage/boltz"
-	cmap "github.com/orcaman/concurrent-map"
+	"github.com/openziti/xweb/v2"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/xeipuuv/gojsonschema"
 	"io"
 	"io/ioutil"
@@ -67,7 +68,7 @@ var _ model.Env = &AppEnv{}
 
 type AppEnv struct {
 	BoltStores *persistence.Stores
-	Handlers   *model.Handlers
+	Managers   *model.Managers
 	Config     *edgeConfig.Config
 
 	Versions *config.Versions
@@ -83,7 +84,7 @@ type AppEnv struct {
 	HostController           HostController
 	ManagementApi            *managementOperations.ZitiEdgeManagementAPI
 	ClientApi                *clientOperations.ZitiEdgeClientAPI
-	IdentityRefreshMap       cmap.ConcurrentMap
+	IdentityRefreshMap       cmap.ConcurrentMap[time.Time]
 	identityRefreshMeter     metrics.Meter
 	StartupTime              time.Time
 	InstanceId               string
@@ -108,8 +109,8 @@ func (ae *AppEnv) GetHostController() model.HostController {
 	return ae.HostController
 }
 
-func (ae *AppEnv) GetHandlers() *model.Handlers {
-	return ae.Handlers
+func (ae *AppEnv) GetManagers() *model.Managers {
+	return ae.Managers
 }
 
 func (ae *AppEnv) GetConfig() *edgeConfig.Config {
@@ -149,9 +150,10 @@ func (ae *AppEnv) GetFingerprintGenerator() cert.FingerprintGenerator {
 }
 
 type HostController interface {
+	RegisterAgentBindHandler(bindHandler channel.BindHandler)
 	RegisterXctrl(x xctrl.Xctrl) error
 	RegisterXmgmt(x xmgmt.Xmgmt) error
-	RegisterXWebHandlerFactory(x xweb.WebHandlerFactory) error
+	GetXWebInstance() xweb.Instance
 	GetNetwork() *network.Network
 	GetCloseNotifyChannel() <-chan struct{}
 	Shutdown()
@@ -251,9 +253,9 @@ func (ae *AppEnv) FillRequestContext(rc *response.RequestContext) error {
 
 	if rc.SessionToken != "" {
 		var err error
-		rc.ApiSession, err = ae.GetHandlers().ApiSession.ReadByToken(rc.SessionToken)
+		rc.ApiSession, err = ae.GetManagers().ApiSession.ReadByToken(rc.SessionToken)
 		if err != nil {
-			logger.WithError(err).Debugf("looking up API session for %s resulted in an error, request will continue unauthenticated", rc.SessionToken)
+			logger.WithError(err).Debugf("looking up ApiConfig session for %s resulted in an error, request will continue unauthenticated", rc.SessionToken)
 			rc.ApiSession = nil
 			rc.SessionToken = ""
 		}
@@ -261,10 +263,10 @@ func (ae *AppEnv) FillRequestContext(rc *response.RequestContext) error {
 
 	if rc.ApiSession != nil {
 		//updates for api session timeouts
-		ae.GetHandlers().ApiSession.MarkActivityById(rc.ApiSession.Id)
+		ae.GetManagers().ApiSession.MarkActivityById(rc.ApiSession.Id)
 
 		var err error
-		rc.Identity, err = ae.GetHandlers().Identity.Read(rc.ApiSession.IdentityId)
+		rc.Identity, err = ae.GetManagers().Identity.Read(rc.ApiSession.IdentityId)
 		if err != nil {
 			if boltz.IsErrNotFoundErr(err) {
 				apiErr := errorz.NewUnauthorized()
@@ -279,7 +281,7 @@ func (ae *AppEnv) FillRequestContext(rc *response.RequestContext) error {
 
 	if rc.Identity != nil {
 		var err error
-		rc.AuthPolicy, err = ae.GetHandlers().AuthPolicy.Read(rc.Identity.AuthPolicyId)
+		rc.AuthPolicy, err = ae.GetManagers().AuthPolicy.Read(rc.Identity.AuthPolicyId)
 
 		if err != nil {
 			if boltz.IsErrNotFoundErr(err) {
@@ -330,20 +332,13 @@ func processSecondaryJwtSigner(ae *AppEnv, rc *response.RequestContext) bool {
 		extJwtAuthVal := ae.GetAuthRegistry().GetByMethod(model.AuthMethodExtJwt)
 		extJwtAuth := extJwtAuthVal.(*model.AuthModuleExtJwt)
 		if extJwtAuth != nil {
-			identityId, externalId, extJwtSignerId, err := extJwtAuth.ProcessSecondary(model.NewAuthContextHttp(rc.Request, model.AuthMethodExtJwt, nil))
+			authResult, err := extJwtAuth.ProcessSecondary(model.NewAuthContextHttp(rc.Request, model.AuthMethodExtJwt, nil))
 
 			if err != nil {
 				return false
 			}
 
-			if rc.AuthStatus.SecondaryExtJwtSignerId != extJwtSignerId {
-				return false
-			}
-
-			if (identityId != "" && identityId == rc.Identity.Id) || (externalId != "" && rc.Identity.ExternalId != nil && externalId == *rc.Identity.ExternalId) {
-				rc.AuthStatus.PassedSecondaryExtJwtSignerId = true
-				return true
-			}
+			return authResult.IsSuccessful()
 		}
 
 		return false
@@ -381,7 +376,7 @@ func NewAppEnv(c *edgeConfig.Config, host HostController) *AppEnv {
 		EnrollRegistry:     &model.EnrollmentRegistryImpl{},
 		ManagementApi:      managementApi,
 		ClientApi:          clientApi,
-		IdentityRefreshMap: cmap.New(),
+		IdentityRefreshMap: cmap.New[time.Time](),
 		StartupTime:        time.Now().UTC(),
 	}
 
@@ -400,7 +395,7 @@ func NewAppEnv(c *edgeConfig.Config, host HostController) *AppEnv {
 	clientApi.ApplicationXPemFileProducer = &PemProducer{}
 	clientApi.TextYamlProducer = &YamlProducer{}
 	clientApi.ZtSessionAuth = func(token string) (principal interface{}, err error) {
-		principal, err = ae.GetHandlers().ApiSession.ReadByToken(token)
+		principal, err = ae.GetManagers().ApiSession.ReadByToken(token)
 
 		if err != nil {
 			if !boltz.IsErrNotFoundErr(err) {
@@ -469,7 +464,7 @@ func (ae *AppEnv) InitPersistence() error {
 		}
 	})
 
-	ae.Handlers = model.InitHandlers(ae)
+	ae.Managers = model.InitEntityManagers(ae)
 	events.Init(ae.GetDbProvider(), ae.BoltStores, ae.GetHostController().GetCloseNotifyChannel())
 
 	persistence.ServiceEvents.AddServiceEventHandler(ae.HandleServiceEvent)
@@ -606,7 +601,7 @@ func (ae *AppEnv) IsAllowed(responderFunc func(ae *AppEnv, rc *response.RequestC
 		} else {
 			pfxlog.Logger().WithFields(map[string]interface{}{
 				"url": request.URL,
-			}).Warn("could not mark metrics for REST API endpoint, request context start time is zero")
+			}).Warn("could not mark metrics for REST ApiConfig endpoint, request context start time is zero")
 		}
 	})
 }

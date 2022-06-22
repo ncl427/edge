@@ -17,6 +17,7 @@
 package model
 
 import (
+	"crypto/x509"
 	"github.com/openziti/edge/controller/apierror"
 	"github.com/openziti/edge/controller/persistence"
 	"github.com/openziti/fabric/controller/models"
@@ -31,8 +32,9 @@ import (
 type ExternalJwtSigner struct {
 	models.BaseEntity
 	Name            string
-	CertPem         string
-	Kid             string
+	CertPem         *string
+	JwksEndpoint    *string
+	Kid             *string
 	Enabled         bool
 	ExternalAuthUrl *string
 	UseExternalId   bool
@@ -41,30 +43,32 @@ type ExternalJwtSigner struct {
 	Audience        *string
 
 	CommonName  string
-	Fingerprint string
+	Fingerprint *string
 	NotAfter    time.Time
 	NotBefore   time.Time
 }
 
 func (entity *ExternalJwtSigner) toBoltEntity() (boltz.Entity, error) {
-	signerCerts := nfpem.PemStringToCertificates(entity.CertPem)
+	var fingerprint string
+	var signerCert *x509.Certificate
 
-	if len(signerCerts) != 1 {
-		return nil, apierror.NewInvalidCertificatePem()
+	if entity.CertPem != nil {
+		signerCerts := nfpem.PemStringToCertificates(*entity.CertPem)
+		if len(signerCerts) != 1 {
+			return nil, apierror.NewInvalidCertificatePem()
+		}
+
+		signerCert = signerCerts[0]
+
+		fingerprint = nfpem.FingerprintFromCertificate(signerCert)
 	}
-
-	signerCert := signerCerts[0]
-
-	fingerprint := nfpem.FingerprintFromCertificate(signerCert)
 
 	signer := &persistence.ExternalJwtSigner{
 		BaseExtEntity:   *boltz.NewExtEntity(entity.Id, entity.Tags),
 		Name:            entity.Name,
-		Fingerprint:     fingerprint,
+		Fingerprint:     &fingerprint,
 		CertPem:         entity.CertPem,
-		CommonName:      signerCert.Subject.CommonName,
-		NotAfter:        &signerCert.NotAfter,
-		NotBefore:       &signerCert.NotBefore,
+		JwksEndpoint:    entity.JwksEndpoint,
 		Enabled:         entity.Enabled,
 		ExternalAuthUrl: entity.ExternalAuthUrl,
 		UseExternalId:   entity.UseExternalId,
@@ -74,22 +78,29 @@ func (entity *ExternalJwtSigner) toBoltEntity() (boltz.Entity, error) {
 		Audience:        entity.Audience,
 	}
 
+	if entity.CertPem != nil {
+		signer.CommonName = signerCert.Subject.CommonName
+		signer.NotAfter = &signerCert.NotAfter
+		signer.NotBefore = &signerCert.NotBefore
+	}
+
 	return signer, nil
 }
 
-func (entity *ExternalJwtSigner) toBoltEntityForCreate(*bbolt.Tx, Handler) (boltz.Entity, error) {
+func (entity *ExternalJwtSigner) toBoltEntityForCreate(*bbolt.Tx, EntityManager) (boltz.Entity, error) {
 	return entity.toBoltEntity()
 }
 
-func (entity *ExternalJwtSigner) toBoltEntityForUpdate(*bbolt.Tx, Handler) (boltz.Entity, error) {
+func (entity *ExternalJwtSigner) toBoltEntityForUpdate(*bbolt.Tx, EntityManager) (boltz.Entity, error) {
 	return entity.toBoltEntity()
 }
 
-func (entity *ExternalJwtSigner) toBoltEntityForPatch(*bbolt.Tx, Handler, boltz.FieldChecker) (boltz.Entity, error) {
+func (entity *ExternalJwtSigner) toBoltEntityForPatch(*bbolt.Tx, EntityManager, boltz.FieldChecker) (boltz.Entity, error) {
 	signer := &persistence.ExternalJwtSigner{
 		BaseExtEntity:   *boltz.NewExtEntity(entity.Id, entity.Tags),
 		Name:            entity.Name,
 		CertPem:         entity.CertPem,
+		JwksEndpoint:    entity.JwksEndpoint,
 		Enabled:         entity.Enabled,
 		ExternalAuthUrl: entity.ExternalAuthUrl,
 		UseExternalId:   entity.UseExternalId,
@@ -99,8 +110,8 @@ func (entity *ExternalJwtSigner) toBoltEntityForPatch(*bbolt.Tx, Handler, boltz.
 		Audience:        entity.Issuer,
 	}
 
-	if entity.CertPem != "" {
-		signerCerts := nfpem.PemStringToCertificates(entity.CertPem)
+	if entity.CertPem != nil && *entity.CertPem != "" {
+		signerCerts := nfpem.PemStringToCertificates(*entity.CertPem)
 
 		if len(signerCerts) != 1 {
 			return nil, apierror.NewInvalidCertificatePem()
@@ -112,13 +123,13 @@ func (entity *ExternalJwtSigner) toBoltEntityForPatch(*bbolt.Tx, Handler, boltz.
 		signer.CommonName = signerCert.Subject.CommonName
 		signer.NotBefore = &signerCert.NotBefore
 		signer.NotAfter = &signerCert.NotAfter
-		signer.Fingerprint = fingerprint
+		signer.Fingerprint = &fingerprint
 	}
 
 	return signer, nil
 }
 
-func (entity *ExternalJwtSigner) fillFrom(_ Handler, _ *bbolt.Tx, boltEntity boltz.Entity) error {
+func (entity *ExternalJwtSigner) fillFrom(_ EntityManager, _ *bbolt.Tx, boltEntity boltz.Entity) error {
 	boltExternalJwtSigner, ok := boltEntity.(*persistence.ExternalJwtSigner)
 	if !ok {
 		return errors.Errorf("unexpected type %v when filling model ExternalJwtSigner", reflect.TypeOf(boltEntity))
@@ -127,6 +138,7 @@ func (entity *ExternalJwtSigner) fillFrom(_ Handler, _ *bbolt.Tx, boltEntity bol
 	entity.Name = boltExternalJwtSigner.Name
 	entity.CommonName = boltExternalJwtSigner.CommonName
 	entity.CertPem = boltExternalJwtSigner.CertPem
+	entity.JwksEndpoint = boltExternalJwtSigner.JwksEndpoint
 	entity.Fingerprint = boltExternalJwtSigner.Fingerprint
 	entity.Enabled = boltExternalJwtSigner.Enabled
 	entity.NotBefore = *boltExternalJwtSigner.NotBefore

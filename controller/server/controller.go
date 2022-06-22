@@ -20,6 +20,7 @@ import "C"
 import (
 	"fmt"
 	"github.com/openziti/channel"
+	"github.com/openziti/edge/controller/handler_edge_mgmt"
 	sync2 "github.com/openziti/edge/controller/sync_strats"
 	"github.com/openziti/edge/pb/edge_ctrl_pb"
 	"github.com/openziti/fabric/controller/api_impl"
@@ -171,7 +172,9 @@ func (c *Controller) GetCtrlHandlers(binding channel.Binding) []channel.TypedRec
 }
 
 func (c *Controller) GetMgmtHandlers() []channel.TypedReceiveHandler {
-	return []channel.TypedReceiveHandler{}
+	return []channel.TypedReceiveHandler{
+		handler_edge_mgmt.NewInitEdgeHandler(c.AppEnv),
+	}
 }
 
 func (c *Controller) LoadConfig(cfgmap map[interface{}]interface{}) error {
@@ -276,7 +279,7 @@ func (c *Controller) Run() {
 		rf(c.AppEnv)
 	}
 
-	admin, err := c.AppEnv.Handlers.Identity.ReadDefaultAdmin()
+	admin, err := c.AppEnv.Managers.Identity.ReadDefaultAdmin()
 
 	if err != nil {
 		pfxlog.Logger().WithError(err).Panic("could not check if a default admin exists")
@@ -289,11 +292,11 @@ func (c *Controller) Run() {
 	managementApiFactory := NewManagementApiFactory(c.AppEnv)
 	clientApiFactory := NewClientApiFactory(c.AppEnv)
 
-	if err := c.AppEnv.HostController.RegisterXWebHandlerFactory(managementApiFactory); err != nil {
+	if err := c.AppEnv.HostController.GetXWebInstance().GetRegistry().Add(managementApiFactory); err != nil {
 		pfxlog.Logger().Fatalf("failed to create Edge Management API factory: %v", err)
 	}
 
-	if err := c.AppEnv.HostController.RegisterXWebHandlerFactory(clientApiFactory); err != nil {
+	if err := c.AppEnv.HostController.GetXWebInstance().GetRegistry().Add(clientApiFactory); err != nil {
 		pfxlog.Logger().Fatalf("failed to create Edge Client API factory: %v", err)
 	}
 
@@ -310,7 +313,7 @@ func (c *Controller) Shutdown() {
 
 		c.AppEnv.Broker.Stop()
 
-		c.AppEnv.GetHandlers().ApiSession.HeartbeatCollector.Stop()
+		c.AppEnv.GetManagers().ApiSession.HeartbeatCollector.Stop()
 
 		pfxlog.Logger().Info("edge controller: stopped")
 

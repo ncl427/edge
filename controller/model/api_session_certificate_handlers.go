@@ -28,7 +28,7 @@ import (
 
 func NewApiSessionCertificateHandler(env Env) *ApiSessionCertificateHandler {
 	handler := &ApiSessionCertificateHandler{
-		baseHandler: newBaseHandler(env, env.GetStores().ApiSessionCertificate),
+		baseEntityManager: newBaseEntityManager(env, env.GetStores().ApiSessionCertificate),
 	}
 	handler.impl = handler
 
@@ -36,7 +36,7 @@ func NewApiSessionCertificateHandler(env Env) *ApiSessionCertificateHandler {
 }
 
 type ApiSessionCertificateHandler struct {
-	baseHandler
+	baseEntityManager
 }
 
 func (handler *ApiSessionCertificateHandler) newModelEntity() boltEntitySink {
@@ -94,15 +94,6 @@ func (handler *ApiSessionCertificateHandler) CreateFromCSR(apiSessionId string, 
 func (handler *ApiSessionCertificateHandler) Read(id string) (*ApiSessionCertificate, error) {
 	modelApiSessionCertificate := &ApiSessionCertificate{}
 	if err := handler.readEntity(id, modelApiSessionCertificate); err != nil {
-		return nil, err
-	}
-	return modelApiSessionCertificate, nil
-}
-
-func (handler *ApiSessionCertificateHandler) ReadByFingerprint(fingerprint string) (*ApiSessionCertificate, error) {
-	modelApiSessionCertificate := &ApiSessionCertificate{}
-	tokenIndex := handler.env.GetStores().ApiSessionCertificate.GetFingerprintIndex()
-	if err := handler.readEntityWithIndex("fingerprint", []byte(fingerprint), tokenIndex, modelApiSessionCertificate); err != nil {
 		return nil, err
 	}
 	return modelApiSessionCertificate, nil

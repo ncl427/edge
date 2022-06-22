@@ -68,11 +68,11 @@ func (r *ConfigRouter) Register(ae *env.AppEnv) {
 }
 
 func (r *ConfigRouter) List(ae *env.AppEnv, rc *response.RequestContext) {
-	ListWithHandler(ae, rc, ae.Handlers.Config, MapConfigToRestEntity)
+	ListWithHandler(ae, rc, ae.Managers.Config, MapConfigToRestEntity)
 }
 
 func (r *ConfigRouter) Detail(ae *env.AppEnv, rc *response.RequestContext) {
-	DetailWithHandler(ae, rc, ae.Handlers.Config, MapConfigToRestEntity)
+	DetailWithHandler(ae, rc, ae.Managers.Config, MapConfigToRestEntity)
 }
 
 func (r *ConfigRouter) Create(ae *env.AppEnv, rc *response.RequestContext, params config.CreateConfigParams) {
@@ -82,12 +82,20 @@ func (r *ConfigRouter) Create(ae *env.AppEnv, rc *response.RequestContext, param
 	}
 
 	Create(rc, rc, ConfigLinkFactory, func() (string, error) {
-		return ae.Handlers.Config.Create(MapCreateConfigToModel(params.Config))
+		entity, err := MapCreateConfigToModel(params.Config)
+		if err != nil {
+			return "", err
+		}
+		err = ae.Managers.Config.Create(entity)
+		if err != nil {
+			return "", err
+		}
+		return entity.Id, nil
 	})
 }
 
 func (r *ConfigRouter) Delete(ae *env.AppEnv, rc *response.RequestContext) {
-	DeleteWithHandler(rc, ae.Handlers.Config)
+	DeleteWithHandler(rc, ae.Managers.Config)
 }
 
 func (r *ConfigRouter) Update(ae *env.AppEnv, rc *response.RequestContext, params config.UpdateConfigParams) {
@@ -97,12 +105,23 @@ func (r *ConfigRouter) Update(ae *env.AppEnv, rc *response.RequestContext, param
 	}
 
 	Update(rc, func(id string) error {
-		return ae.Handlers.Config.Update(MapUpdateConfigToModel(params.ID, params.Config))
+		model, err := MapUpdateConfigToModel(params.ID, params.Config)
+
+		if err != nil {
+			return err
+		}
+
+		return ae.Managers.Config.Update(model, nil)
 	})
 }
 
 func (r *ConfigRouter) Patch(ae *env.AppEnv, rc *response.RequestContext, params config.PatchConfigParams) {
 	Patch(rc, func(id string, fields api.JsonFields) error {
-		return ae.Handlers.Config.Patch(MapPatchConfigToModel(params.ID, params.Config), fields.FilterMaps("tags", "data"))
+		model, err := MapPatchConfigToModel(params.ID, params.Config)
+
+		if err != nil {
+			return err
+		}
+		return ae.Managers.Config.Update(model, fields.FilterMaps("tags", "data"))
 	})
 }

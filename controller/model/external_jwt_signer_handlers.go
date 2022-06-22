@@ -24,14 +24,14 @@ import (
 
 func NewExternalJwtSignerHandler(env Env) *ExternalJwtSignerHandler {
 	handler := &ExternalJwtSignerHandler{
-		baseHandler: newBaseHandler(env, env.GetStores().ExternalJwtSigner),
+		baseEntityManager: newBaseEntityManager(env, env.GetStores().ExternalJwtSigner),
 	}
 	handler.impl = handler
 	return handler
 }
 
 type ExternalJwtSignerHandler struct {
-	baseHandler
+	baseEntityManager
 }
 
 func (handler *ExternalJwtSignerHandler) IsUpdated(_ string) bool {
@@ -42,8 +42,8 @@ func (handler *ExternalJwtSignerHandler) newModelEntity() boltEntitySink {
 	return &ExternalJwtSigner{}
 }
 
-func (handler *ExternalJwtSignerHandler) Create(ExternalJwtSignerModel *ExternalJwtSigner) (string, error) {
-	return handler.createEntity(ExternalJwtSignerModel)
+func (handler *ExternalJwtSignerHandler) Create(model *ExternalJwtSigner) (string, error) {
+	return handler.createEntity(model)
 }
 
 func (handler *ExternalJwtSignerHandler) Read(id string) (*ExternalJwtSigner, error) {
@@ -54,12 +54,12 @@ func (handler *ExternalJwtSignerHandler) Read(id string) (*ExternalJwtSigner, er
 	return modelEntity, nil
 }
 
-func (handler *ExternalJwtSignerHandler) Update(signer *ExternalJwtSigner) error {
-	return handler.updateEntity(signer, handler)
+func (handler *ExternalJwtSignerHandler) Update(model *ExternalJwtSigner) error {
+	return handler.updateEntity(model, handler)
 }
 
-func (handler *ExternalJwtSignerHandler) Patch(signer *ExternalJwtSigner, fields boltz.FieldChecker) error {
-	return handler.patchEntity(signer, fields)
+func (handler *ExternalJwtSignerHandler) Patch(model *ExternalJwtSigner, fields boltz.FieldChecker) error {
+	return handler.patchEntity(model, fields)
 }
 
 func (handler *ExternalJwtSignerHandler) Delete(id string) error {

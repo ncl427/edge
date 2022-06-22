@@ -41,6 +41,60 @@ func Test_Identity(t *testing.T) {
 	ctx.StartServer()
 	ctx.RequireAdminManagementApiLogin()
 
+	t.Run("a new identity with an ott enrollment can be created", func(t *testing.T) {
+		ctx.testContextChanged(t)
+
+		hostCost := rest_model.TerminatorCost(5)
+		hostPrecedence := rest_model.TerminatorPrecedenceDefault
+
+		identityType := rest_model.IdentityTypeRouter
+
+		identityCreate := &rest_model.IdentityCreate{
+			AppData: &rest_model.Tags{
+				SubTags: map[string]any{
+					"one": 1,
+					"two": 2,
+				},
+			},
+			AuthPolicyID:             S("default"),
+			DefaultHostingCost:       &hostCost,
+			DefaultHostingPrecedence: hostPrecedence,
+			Enrollment: &rest_model.IdentityCreateEnrollment{
+				Ott: true,
+			},
+			ExternalID:     S(uuid.NewString()),
+			IsAdmin:        B(false),
+			Name:           S(uuid.NewString()),
+			RoleAttributes: &rest_model.Attributes{"one", "two"},
+			Tags: &rest_model.Tags{
+				SubTags: map[string]any{
+					"one": 1,
+					"two": 2,
+				},
+			},
+			Type: &identityType,
+		}
+
+		err := identityCreate.Validate(DefaultFormats)
+		ctx.Req.NoError(err)
+
+		identityCreateResp := &rest_model.CreateEnvelope{}
+		resp, err := ctx.AdminManagementSession.newAuthenticatedRequest().SetResult(identityCreateResp).SetBody(identityCreate).Post("/identities")
+		ctx.NoError(err)
+		ctx.NotNil(resp)
+
+		ctx.NoError(identityCreateResp.Validate(DefaultFormats))
+
+		enrollmentResp := &rest_model.ListEnrollmentsEnvelope{}
+		resp, err = ctx.AdminManagementSession.newAuthenticatedRequest().SetResult(enrollmentResp).Get("/identities/" + identityCreateResp.Data.ID + "/enrollments")
+		ctx.NoError(err)
+		ctx.NotNil(resp)
+		ctx.Equal(http.StatusOK, resp.StatusCode(), string(resp.Body()))
+		ctx.NoError(enrollmentResp.Validate(DefaultFormats), string(resp.Body()))
+		ctx.NotNil(enrollmentResp.Data)
+		ctx.Len(enrollmentResp.Data, 1)
+	})
+
 	t.Run("role attributes should be created", func(t *testing.T) {
 		ctx.testContextChanged(t)
 		role1 := eid.New()
@@ -660,10 +714,12 @@ func Test_Identity(t *testing.T) {
 		jwtSignerCert, jwtSignerPrivate := newSelfSignedCert("Test Jwt Signer Cert - Identity Disabled Test 01")
 
 		extJwtSigner := &rest_model.ExternalJWTSignerCreate{
-			CertPem: S(nfpem.EncodeToString(jwtSignerCert)),
-			Enabled: B(true),
-			Name:    S("Test JWT Signer - Auth Policy - Identity Disable Test 01"),
-			Kid:     S(uuid.NewString()),
+			CertPem:  S(nfpem.EncodeToString(jwtSignerCert)),
+			Enabled:  B(true),
+			Name:     S("Test JWT Signer - Auth Policy - Identity Disable Test 01"),
+			Kid:      S(uuid.NewString()),
+			Issuer:   S(uuid.NewString()),
+			Audience: S(uuid.NewString()),
 		}
 
 		extJwtSignerCreated := &rest_model.CreateEnvelope{}
@@ -672,6 +728,17 @@ func Test_Identity(t *testing.T) {
 		ctx.Req.NoError(err)
 		ctx.Req.Equal(http.StatusCreated, resp.StatusCode(), "expected 201 for POST %T: %s", extJwtSigner, resp.Body())
 		ctx.Req.NotEmpty(extJwtSignerCreated.Data.ID)
+
+		authPolicyPatch := &rest_model.AuthPolicyPatch{
+			Primary: &rest_model.AuthPolicyPrimaryPatch{
+				ExtJWT: &rest_model.AuthPolicyPrimaryExtJWTPatch{
+					AllowedSigners: []string{extJwtSignerCreated.Data.ID},
+				},
+			},
+		}
+		resp, err = ctx.AdminManagementSession.newAuthenticatedRequest().SetBody(authPolicyPatch).Patch("/auth-policies/default")
+		ctx.NoError(err)
+		ctx.Equal(http.StatusOK, resp.StatusCode())
 
 		identityType := rest_model.IdentityTypeDevice
 		identity := &rest_model.IdentityCreate{
@@ -692,11 +759,11 @@ func Test_Identity(t *testing.T) {
 
 			jwtToken := jwt.New(jwt.SigningMethodES256)
 			jwtToken.Claims = jwt.StandardClaims{
-				Audience:  "ziti.controller",
+				Audience:  *extJwtSigner.Audience,
 				ExpiresAt: time.Now().Add(2 * time.Hour).Unix(),
 				Id:        time.Now().String(),
 				IssuedAt:  time.Now().Unix(),
-				Issuer:    "fake.issuer",
+				Issuer:    *extJwtSigner.Issuer,
 				NotBefore: time.Now().Unix(),
 				Subject:   identityCreated.Data.ID,
 			}
