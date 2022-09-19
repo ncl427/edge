@@ -545,6 +545,8 @@ definitions:
     properties:
       name:
         type: string
+      blockId:
+        type: string
       type:
         $ref: 'identity-types.yml#/definitions/identityType'
       isAdmin:

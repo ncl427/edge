@@ -89,6 +89,7 @@ type SdkInfo struct {
 
 type Identity struct {
 	boltz.BaseExtEntity
+	BlockID                   string
 	Name                      string
 	IdentityTypeId            string
 	IsDefaultAdmin            bool

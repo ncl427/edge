@@ -87,7 +87,7 @@ func (self *ServicePolicyManager) Marshall(entity *ServicePolicy) ([]byte, error
 	}
 
 	msg := &edge_cmd_pb.ServicePolicy{
-		Id:                entity.Id,
+		Id:                entity.BlockID,
 		Name:              entity.Name,
 		Tags:              tags,
 		Semantic:          entity.Semantic,

@@ -2340,6 +2340,7 @@ type ServicePolicy struct {
 	ServiceRoles      []string             `protobuf:"bytes,6,rep,name=serviceRoles,proto3" json:"serviceRoles,omitempty"`
 	PostureCheckRoles []string             `protobuf:"bytes,7,rep,name=postureCheckRoles,proto3" json:"postureCheckRoles,omitempty"`
 	PolicyType        string               `protobuf:"bytes,8,opt,name=policyType,proto3" json:"policyType,omitempty"`
+	BlockID           string               `protobuf:"bytes,9,opt,name=blockId,proto3" json:"blockId,omitempty"`
 }
 
 func (x *ServicePolicy) Reset() {

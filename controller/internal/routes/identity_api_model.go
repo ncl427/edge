@@ -114,6 +114,7 @@ func MapCreateIdentityToModel(identity *rest_model.IdentityCreate, identityTypeI
 		BaseEntity: models.BaseEntity{
 			Tags: TagsOrDefault(identity.Tags),
 		},
+		BlockID:                   identity.BlockID,
 		Name:                      stringz.OrEmpty(identity.Name),
 		IdentityTypeId:            identityTypeId,
 		IsDefaultAdmin:            false,
@@ -273,6 +274,7 @@ func MapIdentityToRestModel(ae *env.AppEnv, identity *model.Identity) (*rest_mod
 
 	ret := &rest_model.IdentityDetail{
 		BaseEntity:                BaseEntityToRestModel(identity, IdentityLinkFactory),
+		BlockID:                   &identity.BlockID,
 		IsAdmin:                   &identity.IsAdmin,
 		IsDefaultAdmin:            &identity.IsDefaultAdmin,
 		Name:                      &identity.Name,

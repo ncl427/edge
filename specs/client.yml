@@ -3442,6 +3442,7 @@ definitions:
       - name
       - type
       - typeId
+      - blockId
       - isDefaultAdmin
       - isAdmin
       - authenticators
@@ -3465,6 +3466,8 @@ definitions:
           type: string
         authenticators:
           $ref: '#/definitions/identityAuthenticators'
+        blockId:
+          type: string
         defaultHostingCost:
           $ref: '#/definitions/terminatorCost'
         defaultHostingPrecedence:

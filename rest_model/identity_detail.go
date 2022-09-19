@@ -55,6 +55,10 @@ type IdentityDetail struct {
 	// Required: true
 	Authenticators *IdentityAuthenticators `json:"authenticators"`
 
+	// block Id
+	// Required: true
+	BlockID *string `json:"blockId"`
+
 	// default hosting cost
 	// Required: true
 	DefaultHostingCost *TerminatorCost `json:"defaultHostingCost"`
@@ -152,6 +156,8 @@ func (m *IdentityDetail) UnmarshalJSON(raw []byte) error {
 
 		Authenticators *IdentityAuthenticators `json:"authenticators"`
 
+		BlockID *string `json:"blockId"`
+
 		DefaultHostingCost *TerminatorCost `json:"defaultHostingCost"`
 
 		DefaultHostingPrecedence TerminatorPrecedence `json:"defaultHostingPrecedence,omitempty"`
@@ -201,6 +207,8 @@ func (m *IdentityDetail) UnmarshalJSON(raw []byte) error {
 	m.AuthPolicyID = dataAO1.AuthPolicyID
 
 	m.Authenticators = dataAO1.Authenticators
+
+	m.BlockID = dataAO1.BlockID
 
 	m.DefaultHostingCost = dataAO1.DefaultHostingCost
 
@@ -261,6 +269,8 @@ func (m IdentityDetail) MarshalJSON() ([]byte, error) {
 
 		Authenticators *IdentityAuthenticators `json:"authenticators"`
 
+		BlockID *string `json:"blockId"`
+
 		DefaultHostingCost *TerminatorCost `json:"defaultHostingCost"`
 
 		DefaultHostingPrecedence TerminatorPrecedence `json:"defaultHostingPrecedence,omitempty"`
@@ -307,6 +317,8 @@ func (m IdentityDetail) MarshalJSON() ([]byte, error) {
 	dataAO1.AuthPolicyID = m.AuthPolicyID
 
 	dataAO1.Authenticators = m.Authenticators
+
+	dataAO1.BlockID = m.BlockID
 
 	dataAO1.DefaultHostingCost = m.DefaultHostingCost
 
@@ -374,6 +386,10 @@ func (m *IdentityDetail) Validate(formats strfmt.Registry) error {
 	}
 
 	if err := m.validateAuthenticators(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateBlockID(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -507,6 +523,15 @@ func (m *IdentityDetail) validateAuthenticators(formats strfmt.Registry) error {
 			}
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (m *IdentityDetail) validateBlockID(formats strfmt.Registry) error {
+
+	if err := validate.Required("blockId", "body", m.BlockID); err != nil {
+		return err
 	}
 
 	return nil

@@ -16,6 +16,7 @@ definitions:
           - name
           - type
           - typeId
+          - blockId
           - isDefaultAdmin
           - isAdmin
           - authenticators
@@ -34,6 +35,8 @@ definitions:
           - disabled
         properties:
           name:
+            type: string
+          blockId:
             type: string
           type:
             $ref: 'base-entity.yml#/definitions/entityRef'

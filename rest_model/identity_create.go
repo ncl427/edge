@@ -49,6 +49,9 @@ type IdentityCreate struct {
 	// auth policy Id
 	AuthPolicyID *string `json:"authPolicyId,omitempty"`
 
+	// block Id
+	BlockID string `json:"blockId,omitempty"`
+
 	// default hosting cost
 	DefaultHostingCost *TerminatorCost `json:"defaultHostingCost,omitempty"`
 

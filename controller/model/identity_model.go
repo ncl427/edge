@@ -46,6 +46,7 @@ type SdkInfo struct {
 
 type Identity struct {
 	models.BaseEntity
+	BlockID                   string   `json:"blockId"`
 	Name                      string
 	IdentityTypeId            string
 	IsDefaultAdmin            bool
@@ -88,7 +89,8 @@ func (entity *Identity) toBoltEntityForCreate(_ *bbolt.Tx, manager EntityManager
 	entity.IdentityTypeId = identityType.Id
 
 	boltEntity := &persistence.Identity{
-		BaseExtEntity:             *boltz.NewExtEntity(entity.Id, entity.Tags),
+		BaseExtEntity:             *boltz.NewExtEntity(entity.BlockID, entity.Tags),
+		BlockID:                   entity.BlockID,
 		Name:                      entity.Name,
 		IdentityTypeId:            entity.IdentityTypeId,
 		AuthPolicyId:              entity.AuthPolicyId,
@@ -237,6 +239,7 @@ func (entity *Identity) fillFrom(manager EntityManager, tx *bbolt.Tx, boltEntity
 	}
 	entity.FillCommon(boltIdentity)
 	entity.Name = boltIdentity.Name
+	entity.BlockID = boltIdentity.Id
 	entity.IdentityTypeId = boltIdentity.IdentityTypeId
 	entity.AuthPolicyId = boltIdentity.AuthPolicyId
 	entity.IsDefaultAdmin = boltIdentity.IsDefaultAdmin

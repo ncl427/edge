@@ -14287,6 +14287,8 @@ definitions:
       authPolicyId:
         type: string
         x-nullable: true
+      blockId:
+        type: string
       defaultHostingCost:
         $ref: '#/definitions/terminatorCost'
       defaultHostingPrecedence:
@@ -14327,6 +14329,7 @@ definitions:
       - name
       - type
       - typeId
+      - blockId
       - isDefaultAdmin
       - isAdmin
       - authenticators
@@ -14350,6 +14353,8 @@ definitions:
           type: string
         authenticators:
           $ref: '#/definitions/identityAuthenticators'
+        blockId:
+          type: string
         defaultHostingCost:
           $ref: '#/definitions/terminatorCost'
         defaultHostingPrecedence:

@@ -202,7 +202,7 @@ func (self *EdgeServiceManager) Marshall(entity *Service) ([]byte, error) {
 	}
 
 	msg := &edge_cmd_pb.Service{
-		Id:                 entity.Id,
+		Id:                 entity.BlockID,
 		Name:               entity.Name,
 		Tags:               tags,
 		TerminatorStrategy: entity.TerminatorStrategy,

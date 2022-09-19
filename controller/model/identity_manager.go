@@ -85,8 +85,12 @@ func (self *IdentityManager) ApplyCreate(cmd *command.CreateEntityCommand[*Ident
 }
 
 func (self *IdentityManager) CreateWithEnrollments(identityModel *Identity, enrollmentsModels []*Enrollment) error {
+	fmt.Println("IS THIS HAPENNING NOW?------------------------------------------------------", &identityModel)
+
 	if identityModel.Id == "" {
-		identityModel.Id = eid.New()
+		fmt.Println("IS THIS HAPENNING NOW?------------------------------------------------------", &identityModel.BlockID)
+		//identityModel.Id = eid.New()
+		identityModel.Id = identityModel.BlockID
 	}
 
 	for _, enrollment := range enrollmentsModels {

@@ -4751,6 +4751,7 @@ func init() {
             "name",
             "type",
             "typeId",
+            "blockId",
             "isDefaultAdmin",
             "isAdmin",
             "authenticators",
@@ -4777,6 +4778,9 @@ func init() {
             },
             "authenticators": {
               "$ref": "#/definitions/identityAuthenticators"
+            },
+            "blockId": {
+              "type": "string"
             },
             "defaultHostingCost": {
               "$ref": "#/definitions/terminatorCost"
@@ -10750,6 +10754,7 @@ func init() {
             "name",
             "type",
             "typeId",
+            "blockId",
             "isDefaultAdmin",
             "isAdmin",
             "authenticators",
@@ -10776,6 +10781,9 @@ func init() {
             },
             "authenticators": {
               "$ref": "#/definitions/identityAuthenticators"
+            },
+            "blockId": {
+              "type": "string"
             },
             "defaultHostingCost": {
               "$ref": "#/definitions/terminatorCost"
