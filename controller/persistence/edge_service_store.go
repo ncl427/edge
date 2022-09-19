@@ -17,6 +17,7 @@
 package persistence
 
 import (
+	"fmt"
 	"github.com/openziti/edge/eid"
 	"github.com/openziti/fabric/controller/db"
 	"github.com/openziti/foundation/v2/errorz"
@@ -36,6 +37,7 @@ type EdgeService struct {
 	RoleAttributes     []string
 	Configs            []string
 	EncryptionRequired bool
+	BlockID            string
 }
 
 func newEdgeService(name string, roleAttributes ...string) *EdgeService {
@@ -55,6 +57,7 @@ func (entity *EdgeService) LoadValues(store boltz.CrudStore, bucket *boltz.Typed
 	entity.Name = bucket.GetStringOrError(FieldName)
 	entity.RoleAttributes = bucket.GetStringList(FieldRoleAttributes)
 	entity.Configs = bucket.GetStringList(EntityTypeConfigs)
+	//entity.BlockID = bucket.GetStringOrError(FieldBlockId)
 
 	//default to true for old services w/o any value explicitly set
 	entity.EncryptionRequired = bucket.GetBoolWithDefault(FieldServiceEncryptionRequired, true)
@@ -65,10 +68,13 @@ func (entity *EdgeService) SetValues(ctx *boltz.PersistContext) {
 
 	store := ctx.Store.(*edgeServiceStoreImpl)
 	ctx.SetString(FieldName, entity.Name)
+	//ctx.SetString(FieldBlockId, entity.BlockID)
 	store.validateRoleAttributes(entity.RoleAttributes, ctx.Bucket)
 	ctx.SetStringList(FieldRoleAttributes, entity.RoleAttributes)
 	ctx.SetLinkedIds(EntityTypeConfigs, entity.Configs)
 	ctx.SetBool(FieldServiceEncryptionRequired, entity.EncryptionRequired)
+
+	fmt.Println("IS THIS HAPENNING NOW?------------------------------------------------------")
 
 	// index change won't fire if we don't have any roles on create, but we need to evaluate if we match any #all roles
 	if ctx.IsCreate && len(entity.RoleAttributes) == 0 {

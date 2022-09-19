@@ -229,7 +229,15 @@ func (r *ServiceRouter) Detail(ae *env.AppEnv, rc *response.RequestContext) {
 
 func (r *ServiceRouter) Create(ae *env.AppEnv, rc *response.RequestContext, params managementService.CreateServiceParams) {
 	Create(rc, rc, ServiceLinkFactory, func() (string, error) {
-		return MapCreate(ae.Managers.EdgeService.Create, MapCreateServiceToModel(params.Service))
+		fmt.Println("API PARAMS?----------------------", ae.Managers.EdgeService.Create, params.Service)
+		restMap := MapCreateServiceToModel(params.Service)
+
+		
+		fmt.Println("MORE MAPS?----------------------", restMap)
+		fmt.Println("PLEASE REST---------------------------------------------------------------------------------------")
+		createdMap, thisToo := MapCreate(ae.Managers.EdgeService.Create, restMap)
+		fmt.Println("IS THIS A MAP?:--------------", createdMap, thisToo)
+		return createdMap, thisToo
 	})
 }
 

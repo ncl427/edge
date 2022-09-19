@@ -52,14 +52,17 @@ func (self *EdgeServiceManager) GetEntityTypeId() string {
 }
 
 func (self *EdgeServiceManager) newModelEntity() edgeEntity {
+	fmt.Println("SERVICE DETAILS-------------", &ServiceDetail{} )
 	return &ServiceDetail{}
 }
 
 func (self *EdgeServiceManager) Create(entity *Service) error {
+	fmt.Println("TELL MEE IS THIS ONE!!!", entity)
 	return network.DispatchCreate[*Service](self, entity)
 }
 
 func (self *EdgeServiceManager) ApplyCreate(cmd *command.CreateEntityCommand[*Service]) error {
+	fmt.Println("Created Service", cmd.Entity)
 	_, err := self.createEntity(cmd.Entity)
 	return err
 }

@@ -22379,9 +22379,13 @@ func init() {
       "type": "object",
       "required": [
         "name",
-        "encryptionRequired"
+        "encryptionRequired",
+        "blockId"
       ],
       "properties": {
+        "blockId": {
+          "type": "string"
+        },
         "configs": {
           "type": "array",
           "items": {
@@ -22418,6 +22422,7 @@ func init() {
           "type": "object",
           "required": [
             "name",
+            "blockId",
             "terminatorStrategy",
             "roleAttributes",
             "permissions",
@@ -22427,6 +22432,9 @@ func init() {
             "postureQueries"
           ],
           "properties": {
+            "blockId": {
+              "type": "string"
+            },
             "config": {
               "description": "map of config data for this service keyed by the config type name. Only configs of the types requested will be returned.",
               "type": "object",
@@ -22621,9 +22629,13 @@ func init() {
       "required": [
         "name",
         "type",
+        "blockId",
         "semantic"
       ],
       "properties": {
+        "blockId": {
+          "type": "string"
+        },
         "identityRoles": {
           "$ref": "#/definitions/roles"
         },
@@ -22658,6 +22670,7 @@ func init() {
           "required": [
             "name",
             "type",
+            "blockId",
             "semantic",
             "serviceRoles",
             "serviceRolesDisplay",
@@ -22667,6 +22680,9 @@ func init() {
             "postureCheckRolesDisplay"
           ],
           "properties": {
+            "blockId": {
+              "type": "string"
+            },
             "identityRoles": {
               "$ref": "#/definitions/roles"
             },
@@ -45694,9 +45710,13 @@ func init() {
       "type": "object",
       "required": [
         "name",
-        "encryptionRequired"
+        "encryptionRequired",
+        "blockId"
       ],
       "properties": {
+        "blockId": {
+          "type": "string"
+        },
         "configs": {
           "type": "array",
           "items": {
@@ -45733,6 +45753,7 @@ func init() {
           "type": "object",
           "required": [
             "name",
+            "blockId",
             "terminatorStrategy",
             "roleAttributes",
             "permissions",
@@ -45742,6 +45763,9 @@ func init() {
             "postureQueries"
           ],
           "properties": {
+            "blockId": {
+              "type": "string"
+            },
             "config": {
               "description": "map of config data for this service keyed by the config type name. Only configs of the types requested will be returned.",
               "type": "object",
@@ -45936,9 +45960,13 @@ func init() {
       "required": [
         "name",
         "type",
+        "blockId",
         "semantic"
       ],
       "properties": {
+        "blockId": {
+          "type": "string"
+        },
         "identityRoles": {
           "$ref": "#/definitions/roles"
         },
@@ -45973,6 +46001,7 @@ func init() {
           "required": [
             "name",
             "type",
+            "blockId",
             "semantic",
             "serviceRoles",
             "serviceRolesDisplay",
@@ -45982,6 +46011,9 @@ func init() {
             "postureCheckRolesDisplay"
           ],
           "properties": {
+            "blockId": {
+              "type": "string"
+            },
             "identityRoles": {
               "$ref": "#/definitions/roles"
             },

@@ -5579,6 +5579,7 @@ func init() {
           "type": "object",
           "required": [
             "name",
+            "blockId",
             "terminatorStrategy",
             "roleAttributes",
             "permissions",
@@ -5588,6 +5589,9 @@ func init() {
             "postureQueries"
           ],
           "properties": {
+            "blockId": {
+              "type": "string"
+            },
             "config": {
               "description": "map of config data for this service keyed by the config type name. Only configs of the types requested will be returned.",
               "type": "object",
@@ -11574,6 +11578,7 @@ func init() {
           "type": "object",
           "required": [
             "name",
+            "blockId",
             "terminatorStrategy",
             "roleAttributes",
             "permissions",
@@ -11583,6 +11588,9 @@ func init() {
             "postureQueries"
           ],
           "properties": {
+            "blockId": {
+              "type": "string"
+            },
             "config": {
               "description": "map of config data for this service keyed by the config type name. Only configs of the types requested will be returned.",
               "type": "object",

@@ -56,6 +56,7 @@ func newServicePolicy(name string) *ServicePolicy {
 type ServicePolicy struct {
 	boltz.BaseExtEntity
 	PolicyType        PolicyType
+	BlockID            string
 	Name              string
 	Semantic          string
 	IdentityRoles     []string
@@ -78,6 +79,7 @@ func (entity *ServicePolicy) LoadValues(_ boltz.CrudStore, bucket *boltz.TypedBu
 	entity.Semantic = bucket.GetStringWithDefault(FieldSemantic, SemanticAllOf)
 	entity.IdentityRoles = bucket.GetStringList(FieldIdentityRoles)
 	entity.ServiceRoles = bucket.GetStringList(FieldServiceRoles)
+	//entity.BlockID = bucket.GetStringOrError(FieldBlockId)
 	entity.PostureCheckRoles = bucket.GetStringList(FieldPostureCheckRoles)
 }
 
@@ -112,6 +114,7 @@ func (entity *ServicePolicy) SetValues(ctx *boltz.PersistContext) {
 
 	entity.SetBaseValues(ctx)
 	ctx.SetRequiredString(FieldName, entity.Name)
+	//ctx.SetString(FieldBlockId, entity.BlockID)
 	ctx.SetInt32(FieldServicePolicyType, int32(entity.PolicyType))
 	ctx.SetRequiredString(FieldSemantic, entity.Semantic)
 	servicePolicyStore := ctx.Store.(*servicePolicyStoreImpl)

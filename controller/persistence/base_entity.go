@@ -47,6 +47,7 @@ const (
 	FieldName           = "name"
 	FieldSemantic       = "semantic"
 	FieldRoleAttributes = "roleAttributes"
+	FieldBlockId        = "blockId"
 
 	FieldEdgeRouterRoles   = "edgeRouterRoles"
 	FieldIdentityRoles     = "identityRoles"

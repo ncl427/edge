@@ -44,6 +44,10 @@ import (
 type ServicePolicyDetail struct {
 	BaseEntity
 
+	// block Id
+	// Required: true
+	BlockID *string `json:"blockId"`
+
 	// identity roles
 	// Required: true
 	IdentityRoles Roles `json:"identityRoles"`
@@ -92,6 +96,8 @@ func (m *ServicePolicyDetail) UnmarshalJSON(raw []byte) error {
 
 	// AO1
 	var dataAO1 struct {
+		BlockID *string `json:"blockId"`
+
 		IdentityRoles Roles `json:"identityRoles"`
 
 		IdentityRolesDisplay NamedRoles `json:"identityRolesDisplay"`
@@ -113,6 +119,8 @@ func (m *ServicePolicyDetail) UnmarshalJSON(raw []byte) error {
 	if err := swag.ReadJSON(raw, &dataAO1); err != nil {
 		return err
 	}
+
+	m.BlockID = dataAO1.BlockID
 
 	m.IdentityRoles = dataAO1.IdentityRoles
 
@@ -145,6 +153,8 @@ func (m ServicePolicyDetail) MarshalJSON() ([]byte, error) {
 	}
 	_parts = append(_parts, aO0)
 	var dataAO1 struct {
+		BlockID *string `json:"blockId"`
+
 		IdentityRoles Roles `json:"identityRoles"`
 
 		IdentityRolesDisplay NamedRoles `json:"identityRolesDisplay"`
@@ -163,6 +173,8 @@ func (m ServicePolicyDetail) MarshalJSON() ([]byte, error) {
 
 		Type *DialBind `json:"type"`
 	}
+
+	dataAO1.BlockID = m.BlockID
 
 	dataAO1.IdentityRoles = m.IdentityRoles
 
@@ -196,6 +208,10 @@ func (m *ServicePolicyDetail) Validate(formats strfmt.Registry) error {
 
 	// validation for a type composition with BaseEntity
 	if err := m.BaseEntity.Validate(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateBlockID(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -238,6 +254,15 @@ func (m *ServicePolicyDetail) Validate(formats strfmt.Registry) error {
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
+	return nil
+}
+
+func (m *ServicePolicyDetail) validateBlockID(formats strfmt.Registry) error {
+
+	if err := validate.Required("blockId", "body", m.BlockID); err != nil {
+		return err
+	}
+
 	return nil
 }
 

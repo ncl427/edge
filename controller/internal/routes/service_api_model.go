@@ -58,12 +58,14 @@ func MapCreateServiceToModel(service *rest_model.ServiceCreate) *model.Service {
 		BaseEntity: models.BaseEntity{
 			Tags: TagsOrDefault(service.Tags),
 		},
+		BlockID:            stringz.OrEmpty(service.BlockID),
 		Name:               stringz.OrEmpty(service.Name),
 		TerminatorStrategy: service.TerminatorStrategy,
 		RoleAttributes:     service.RoleAttributes,
 		Configs:            service.Configs,
 		EncryptionRequired: *service.EncryptionRequired,
 	}
+	fmt.Println("SERVICE MODEL IS THIS?--------------------", ret, stringz.OrEmpty(service.BlockID))
 
 	return ret
 }
@@ -74,6 +76,7 @@ func MapUpdateServiceToModel(id string, service *rest_model.ServiceUpdate) *mode
 			Tags: TagsOrDefault(service.Tags),
 			Id:   id,
 		},
+		//BlockID:            stringz.OrEmpty(service.BlockID),
 		Name:               stringz.OrEmpty(service.Name),
 		TerminatorStrategy: service.TerminatorStrategy,
 		RoleAttributes:     service.RoleAttributes,
@@ -90,6 +93,7 @@ func MapPatchServiceToModel(id string, service *rest_model.ServicePatch) *model.
 			Tags: TagsOrDefault(service.Tags),
 			Id:   id,
 		},
+		//BlockID:            stringz.OrEmpty(service.BlockID),
 		Name:               service.Name,
 		TerminatorStrategy: service.TerminatorStrategy,
 		RoleAttributes:     service.RoleAttributes,
@@ -143,6 +147,7 @@ func MapServiceToRestModel(ae *env.AppEnv, rc *response.RequestContext, service 
 
 	ret := &rest_model.ServiceDetail{
 		BaseEntity:         BaseEntityToRestModel(service, ServiceLinkFactory),
+		BlockID:            &service.BlockID,
 		Name:               &service.Name,
 		TerminatorStrategy: &service.TerminatorStrategy,
 		RoleAttributes:     &roleAttributes,

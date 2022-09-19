@@ -60,6 +60,7 @@ func MapCreateServicePolicyToModel(policy *rest_model.ServicePolicyCreate) *mode
 		BaseEntity: models.BaseEntity{
 			Tags: TagsOrDefault(policy.Tags),
 		},
+		BlockID:           stringz.OrEmpty(policy.BlockID),
 		Name:              stringz.OrEmpty(policy.Name),
 		PolicyType:        string(*policy.Type),
 		Semantic:          semantic,
@@ -140,6 +141,7 @@ func MapServicePolicyToRestModel(ae *env.AppEnv, policy *model.ServicePolicy) (*
 		IdentityRoles:            policy.IdentityRoles,
 		IdentityRolesDisplay:     GetNamedIdentityRoles(ae.GetManagers().Identity, policy.IdentityRoles),
 		Name:                     &policy.Name,
+		BlockID:                  &policy.BlockID,
 		Semantic:                 &semantic,
 		ServiceRoles:             policy.ServiceRoles,
 		ServiceRolesDisplay:      GetNamedServiceRoles(ae.GetManagers().EdgeService, policy.ServiceRoles),

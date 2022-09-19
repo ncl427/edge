@@ -30,6 +30,7 @@ import (
 
 type ServicePolicy struct {
 	models.BaseEntity
+	BlockID            string   `json:"blockId"`
 	Name              string
 	PolicyType        string
 	Semantic          string
@@ -63,6 +64,7 @@ func (entity *ServicePolicy) toBoltEntity(checker boltz.FieldChecker) (boltz.Ent
 	return &persistence.ServicePolicy{
 		BaseExtEntity:     *boltz.NewExtEntity(entity.Id, entity.Tags),
 		Name:              entity.Name,
+		BlockID:           entity.BlockID,
 		PolicyType:        policyType,
 		Semantic:          entity.Semantic,
 		IdentityRoles:     entity.IdentityRoles,
@@ -94,6 +96,7 @@ func (entity *ServicePolicy) fillFrom(_ EntityManager, _ *bbolt.Tx, boltEntity b
 
 	entity.FillCommon(boltServicePolicy)
 	entity.Name = boltServicePolicy.Name
+	entity.BlockID = boltServicePolicy.BlockID
 	entity.PolicyType = policyType
 	entity.Semantic = boltServicePolicy.Semantic
 	entity.ServiceRoles = boltServicePolicy.ServiceRoles

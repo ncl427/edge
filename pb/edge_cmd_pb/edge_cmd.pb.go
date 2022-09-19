@@ -2154,6 +2154,7 @@ type Service struct {
 	RoleAttributes     []string             `protobuf:"bytes,5,rep,name=roleAttributes,proto3" json:"roleAttributes,omitempty"`
 	Configs            []string             `protobuf:"bytes,6,rep,name=configs,proto3" json:"configs,omitempty"`
 	EncryptionRequired bool                 `protobuf:"varint,7,opt,name=encryptionRequired,proto3" json:"encryptionRequired,omitempty"`
+	BlockID            string               `protobuf:"bytes,8,opt,name=blockId,proto3" json:"blockId,omitempty"`
 }
 
 func (x *Service) Reset() {

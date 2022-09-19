@@ -240,6 +240,7 @@ definitions:
         required:
           - name
           - type
+          - blockId
           - semantic
           - serviceRoles
           - serviceRolesDisplay
@@ -249,6 +250,8 @@ definitions:
           - postureCheckRolesDisplay
         properties:
           name:
+            type: string
+          blockId:
             type: string
           type:
             $ref: '../shared/base-entity.yml#/definitions/dialBind'
@@ -271,12 +274,15 @@ definitions:
     required:
       - name
       - type
+      - blockId
       - semantic
     properties:
       tags:
         $ref: '../shared/base-entity.yml#/definitions/tags'
       name:
         type: string
+      blockId:
+        type: string 
       type:
         $ref: '../shared/base-entity.yml#/definitions/dialBind'
       semantic:

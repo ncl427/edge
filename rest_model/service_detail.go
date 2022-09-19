@@ -45,6 +45,10 @@ import (
 type ServiceDetail struct {
 	BaseEntity
 
+	// block Id
+	// Required: true
+	BlockID *string `json:"blockId"`
+
 	// map of config data for this service keyed by the config type name. Only configs of the types requested will be returned.
 	// Required: true
 	Config map[string]map[string]interface{} `json:"config"`
@@ -89,6 +93,8 @@ func (m *ServiceDetail) UnmarshalJSON(raw []byte) error {
 
 	// AO1
 	var dataAO1 struct {
+		BlockID *string `json:"blockId"`
+
 		Config map[string]map[string]interface{} `json:"config"`
 
 		Configs []string `json:"configs"`
@@ -108,6 +114,8 @@ func (m *ServiceDetail) UnmarshalJSON(raw []byte) error {
 	if err := swag.ReadJSON(raw, &dataAO1); err != nil {
 		return err
 	}
+
+	m.BlockID = dataAO1.BlockID
 
 	m.Config = dataAO1.Config
 
@@ -138,6 +146,8 @@ func (m ServiceDetail) MarshalJSON() ([]byte, error) {
 	}
 	_parts = append(_parts, aO0)
 	var dataAO1 struct {
+		BlockID *string `json:"blockId"`
+
 		Config map[string]map[string]interface{} `json:"config"`
 
 		Configs []string `json:"configs"`
@@ -154,6 +164,8 @@ func (m ServiceDetail) MarshalJSON() ([]byte, error) {
 
 		TerminatorStrategy *string `json:"terminatorStrategy"`
 	}
+
+	dataAO1.BlockID = m.BlockID
 
 	dataAO1.Config = m.Config
 
@@ -185,6 +197,10 @@ func (m *ServiceDetail) Validate(formats strfmt.Registry) error {
 
 	// validation for a type composition with BaseEntity
 	if err := m.BaseEntity.Validate(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateBlockID(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -223,6 +239,15 @@ func (m *ServiceDetail) Validate(formats strfmt.Registry) error {
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
+	return nil
+}
+
+func (m *ServiceDetail) validateBlockID(formats strfmt.Registry) error {
+
+	if err := validate.Required("blockId", "body", m.BlockID); err != nil {
+		return err
+	}
+
 	return nil
 }
 

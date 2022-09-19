@@ -43,6 +43,10 @@ import (
 // swagger:model serviceCreate
 type ServiceCreate struct {
 
+	// block Id
+	// Required: true
+	BlockID *string `json:"blockId"`
+
 	// configs
 	Configs []string `json:"configs"`
 
@@ -68,6 +72,10 @@ type ServiceCreate struct {
 func (m *ServiceCreate) Validate(formats strfmt.Registry) error {
 	var res []error
 
+	if err := m.validateBlockID(formats); err != nil {
+		res = append(res, err)
+	}
+
 	if err := m.validateEncryptionRequired(formats); err != nil {
 		res = append(res, err)
 	}
@@ -83,6 +91,15 @@ func (m *ServiceCreate) Validate(formats strfmt.Registry) error {
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
+	return nil
+}
+
+func (m *ServiceCreate) validateBlockID(formats strfmt.Registry) error {
+
+	if err := validate.Required("blockId", "body", m.BlockID); err != nil {
+		return err
+	}
+
 	return nil
 }
 

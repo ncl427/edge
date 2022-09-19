@@ -276,8 +276,11 @@ definitions:
     required:
       - name
       - encryptionRequired
+      - blockId
     properties:
       name:
+        type: string
+      blockId:
         type: string
       terminatorStrategy:
         type: string

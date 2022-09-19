@@ -105,6 +105,7 @@ func (ctx *TestContext) testCreateInvalidServices(_ *testing.T) {
 	edgeService.Id = eid.New()
 	edgeService.Name = eid.New()
 	edgeService.TerminatorStrategy = eid.New()
+	edgeService.BlockID = eid.New()
 	err = ctx.Create(edgeService)
 	ctx.EqualError(err, fmt.Sprintf("terminatorStrategy with name %v not found", edgeService.TerminatorStrategy))
 }

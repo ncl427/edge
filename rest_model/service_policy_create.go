@@ -43,6 +43,10 @@ import (
 // swagger:model servicePolicyCreate
 type ServicePolicyCreate struct {
 
+	// block Id
+	// Required: true
+	BlockID *string `json:"blockId"`
+
 	// identity roles
 	IdentityRoles Roles `json:"identityRoles"`
 
@@ -71,6 +75,10 @@ type ServicePolicyCreate struct {
 // Validate validates this service policy create
 func (m *ServicePolicyCreate) Validate(formats strfmt.Registry) error {
 	var res []error
+
+	if err := m.validateBlockID(formats); err != nil {
+		res = append(res, err)
+	}
 
 	if err := m.validateIdentityRoles(formats); err != nil {
 		res = append(res, err)
@@ -103,6 +111,15 @@ func (m *ServicePolicyCreate) Validate(formats strfmt.Registry) error {
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
+	return nil
+}
+
+func (m *ServicePolicyCreate) validateBlockID(formats strfmt.Registry) error {
+
+	if err := validate.Required("blockId", "body", m.BlockID); err != nil {
+		return err
+	}
+
 	return nil
 }
 

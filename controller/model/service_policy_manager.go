@@ -17,6 +17,7 @@
 package model
 
 import (
+	"fmt"
 	"github.com/openziti/edge/pb/edge_cmd_pb"
 	"github.com/openziti/fabric/controller/command"
 	"github.com/openziti/fabric/controller/fields"
@@ -50,6 +51,7 @@ func (self *ServicePolicyManager) Create(entity *ServicePolicy) error {
 }
 
 func (self *ServicePolicyManager) ApplyCreate(cmd *command.CreateEntityCommand[*ServicePolicy]) error {
+	fmt.Println("Created Policy ------------------------", cmd.Entity)
 	_, err := self.createEntity(cmd.Entity)
 	return err
 }

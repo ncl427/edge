@@ -15956,7 +15956,10 @@ definitions:
     required:
     - name
     - encryptionRequired
+    - blockId
     properties:
+      blockId:
+        type: string
       configs:
         type: array
         items:
@@ -15980,6 +15983,7 @@ definitions:
     - type: object
       required:
       - name
+      - blockId
       - terminatorStrategy
       - roleAttributes
       - permissions
@@ -15988,6 +15992,8 @@ definitions:
       - encryptionRequired
       - postureQueries
       properties:
+        blockId:
+          type: string
         config:
           description: map of config data for this service keyed by the config type
             name. Only configs of the types requested will be returned.
@@ -16116,8 +16122,11 @@ definitions:
     required:
     - name
     - type
+    - blockId
     - semantic
     properties:
+      blockId:
+        type: string
       identityRoles:
         $ref: '#/definitions/roles'
       name:
@@ -16140,6 +16149,7 @@ definitions:
       required:
       - name
       - type
+      - blockId
       - semantic
       - serviceRoles
       - serviceRolesDisplay
@@ -16148,6 +16158,8 @@ definitions:
       - postureCheckRoles
       - postureCheckRolesDisplay
       properties:
+        blockId:
+          type: string
         identityRoles:
           $ref: '#/definitions/roles'
         identityRolesDisplay:

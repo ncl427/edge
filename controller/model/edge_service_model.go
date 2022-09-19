@@ -30,6 +30,7 @@ import (
 
 type Service struct {
 	models.BaseEntity
+	BlockID            string   `json:"blockId"`
 	Name               string   `json:"name"`
 	TerminatorStrategy string   `json:"terminatorStrategy"`
 	RoleAttributes     []string `json:"roleAttributes"`
@@ -44,18 +45,21 @@ func (entity *Service) toBoltEntity(tx *bbolt.Tx, manager EntityManager) (boltz.
 
 	edgeService := &persistence.EdgeService{
 		Service: db.Service{
-			BaseExtEntity:      *boltz.NewExtEntity(entity.Id, entity.Tags),
+			BaseExtEntity:      *boltz.NewExtEntity(entity.BlockID, entity.Tags),
 			Name:               entity.Name,
 			TerminatorStrategy: entity.TerminatorStrategy,
 		},
+		BlockID:            entity.BlockID,
 		RoleAttributes:     entity.RoleAttributes,
 		Configs:            entity.Configs,
 		EncryptionRequired: entity.EncryptionRequired,
 	}
+	fmt.Println("THE SERVICE ---------------", entity.BlockID, edgeService)
 	return edgeService, nil
 }
 
 func (entity *Service) toBoltEntityForCreate(tx *bbolt.Tx, manager EntityManager) (boltz.Entity, error) {
+	fmt.Println("THE WILL CREATE ---------------", tx, manager)
 	return entity.toBoltEntity(tx, manager)
 }
 
@@ -93,6 +97,7 @@ func (entity *Service) fillFrom(_ EntityManager, _ *bbolt.Tx, boltEntity boltz.E
 	}
 	entity.FillCommon(boltService)
 	entity.Name = boltService.Name
+	entity.BlockID = boltService.Id
 	entity.TerminatorStrategy = boltService.TerminatorStrategy
 	entity.RoleAttributes = boltService.RoleAttributes
 	entity.Configs = boltService.Configs
@@ -103,6 +108,7 @@ func (entity *Service) fillFrom(_ EntityManager, _ *bbolt.Tx, boltEntity boltz.E
 type ServiceDetail struct {
 	models.BaseEntity
 	Name               string                            `json:"name"`
+	BlockID            string                            `json:"blockId"`
 	TerminatorStrategy string                            `json:"terminatorStrategy"`
 	RoleAttributes     []string                          `json:"roleAttributes"`
 	Permissions        []string                          `json:"permissions"`
@@ -126,6 +132,7 @@ func (entity *ServiceDetail) fillFrom(_ EntityManager, _ *bbolt.Tx, boltEntity b
 	}
 	entity.FillCommon(boltService)
 	entity.Name = boltService.Name
+	entity.BlockID = boltService.Id
 	entity.TerminatorStrategy = boltService.TerminatorStrategy
 	entity.RoleAttributes = boltService.RoleAttributes
 	entity.Configs = boltService.Configs

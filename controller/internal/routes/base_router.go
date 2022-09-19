@@ -540,9 +540,13 @@ func ListAssociations(rc *response.RequestContext, listF listAssocF) {
 }
 
 func MapCreate[T models.Entity](f func(T) error, entity T) (string, error) {
+	fmt.Println("LAS COSAS DE LA VIDA:",entity)
+	fmt.Println("SON ASI:", f)
 	err := f(entity)
 	if err != nil {
+		fmt.Println("UPPPSSSSSSS----------------------------", f)
 		return "", err
 	}
+
 	return entity.GetId(), nil
 }
