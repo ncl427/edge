@@ -62,7 +62,7 @@ func (entity *ServicePolicy) toBoltEntity(checker boltz.FieldChecker) (boltz.Ent
 	}
 
 	return &persistence.ServicePolicy{
-		BaseExtEntity:     *boltz.NewExtEntity(entity.Id, entity.Tags),
+		BaseExtEntity:     *boltz.NewExtEntity(entity.BlockID, entity.Tags),
 		Name:              entity.Name,
 		BlockID:           entity.BlockID,
 		PolicyType:        policyType,
@@ -96,7 +96,7 @@ func (entity *ServicePolicy) fillFrom(_ EntityManager, _ *bbolt.Tx, boltEntity b
 
 	entity.FillCommon(boltServicePolicy)
 	entity.Name = boltServicePolicy.Name
-	entity.BlockID = boltServicePolicy.BlockID
+	entity.BlockID = boltServicePolicy.Id
 	entity.PolicyType = policyType
 	entity.Semantic = boltServicePolicy.Semantic
 	entity.ServiceRoles = boltServicePolicy.ServiceRoles
