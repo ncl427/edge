@@ -18,6 +18,12 @@ package model
 
 import (
 	"fmt"
+	"math/big"
+	"os"
+	"log"
+	"regexp"
+	"reflect"
+
 	"github.com/lucsky/cuid"
 	"github.com/openziti/edge/controller/apierror"
 	"github.com/openziti/edge/controller/persistence"
@@ -27,7 +33,11 @@ import (
 	"github.com/openziti/foundation/v2/stringz"
 	"github.com/openziti/storage/ast"
 	"github.com/openziti/storage/boltz"
+	"github.com/joho/godotenv"
 	"go.etcd.io/bbolt"
+	"github.com/chenzhijie/go-web3"
+	//"github.com/chenzhijie/go-web3/types"
+	"github.com/ethereum/go-ethereum/common"
 	"time"
 )
 
@@ -43,6 +53,12 @@ type SessionManager struct {
 	baseEntityManager
 }
 
+type SessionToken struct {
+	TokenId      *big.Int `json:"tokenId"`
+	TokenType    string   `json:"tokenType"`
+	Valid        bool     `json:"valid"`    
+}
+
 func (self *SessionManager) newModelEntity() edgeEntity {
 	return &Session{}
 }
@@ -52,6 +68,12 @@ type SessionPostureResult struct {
 	Failure          *PostureSessionRequestFailure
 	PassingPolicyIds []string
 	Cause            *fabricApiError.GenericCauseError
+}
+
+//For checking if an Identity has a valid address
+func IsValidAddress(v string) bool {
+    re := regexp.MustCompile("^0x[0-9a-fA-F]{40}$")
+    return re.MatchString(v)
 }
 
 func (self *SessionManager) EvaluatePostureForService(identityId, apiSessionId, sessionType, serviceId, serviceName string) *SessionPostureResult {
@@ -67,6 +89,13 @@ func (self *SessionManager) EvaluatePostureForService(identityId, apiSessionId, 
 
 	var failedPolicyIds []string
 	var successPolicyIds []string
+
+	//Checks that only valid address Ids have session tokens
+	if IsValidAddress(identityId) {
+		self.checkSessionToken(identityId)
+
+	}
+
 
 	for policyId, policyPostureCheck := range policyPostureCheckMap {
 
@@ -149,9 +178,119 @@ func (self *SessionManager) EvaluatePostureForService(identityId, apiSessionId, 
 		Failure:          nil,
 	}
 }
+//For handling the env variables for the Blockchain
+func goDotEnvVariable(key string) string {
+
+	// load .env file
+	err := godotenv.Load(".env")
+  
+	if err != nil {
+	  log.Fatalf("Error loading .env file")
+	}
+  
+	return os.Getenv(key)
+  }
+
+func (self *SessionManager) checkSessionToken(identityId string)  {
+	fmt.Printf("Verifying session tokens for %v\n", identityId)
+
+	// We need to clean this part. Should be called only once. Verify where!!
+	rpcProvider := goDotEnvVariable("RPCURL")
+	sessionTokenAddress := goDotEnvVariable("TOKENADDRESS")
+	sessionTokenABI := goDotEnvVariable("ABI")
+
+	fmt.Printf("godotenv : %s = %s \n", "RPCURL", rpcProvider)
+	
+	web3, err := web3.NewWeb3(rpcProvider)
+
+	if err != nil {
+		panic(err)
+	}
+	blockNumber, err := web3.Eth.GetBlockNumber()
+	if err != nil {
+		panic(err)
+	}
+	contract, err := web3.Eth.NewContract(sessionTokenABI, sessionTokenAddress)
+	if err != nil {
+		panic(err)
+	}
+	//Checking Contract Address
+	fmt.Println("Contract address: ", contract.Address())
+
+	// Checking the Blockcnumber
+	fmt.Println("Current block number: ", blockNumber)
+
+	// Checking the Total Supply of Tokens
+	totalSupply, err := contract.Call("totalSupply")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("Total supply %v\n", totalSupply)
+
+	//To convert to a correct address
+    idAddress := common.HexToAddress(identityId)
+
+	//var myTokens []SessionToken
+
+	ownedTokens, err := contract.Call("getOwnedNfts", idAddress)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("The session tokens for this Identity are %v \n", ownedTokens)
+	
+	//myTokens = ownedTokens.([]SessionToken)
+	iterateToken(ownedTokens)
+
+
+
+
+	
+}
+
+func iterateToken(t interface{}){
+	
+	//for _, token := range ownedTokens {
+		
+   //     fmt.Sprintf("Token IDS are", token.TokenId)
+   // }
+
+   var tokenId *big.Int
+
+	switch reflect.TypeOf(t).Kind() {
+    case reflect.Slice:
+        s := reflect.ValueOf(t)
+
+        for i := 0; i < s.Len(); i++ {
+			//id := reflect.ValueOf(s.Index(i)).Elem().FieldByName("TokenId")
+			//fmt.Println("TokenId", id)
+            fmt.Println(s.Index(i))
+			conreteSession:= s.Index(i).Interface()
+			fmt.Println(conreteSession)
+
+			v := reflect.ValueOf(conreteSession).FieldByName("TokenId")
+			fmt.Println("fields: ", reflect.ValueOf(conreteSession).NumField())
+			tokenId = v.Interface().(*big.Int)
+        
+			
+			fmt.Println("TokenId is", v, tokenId)
+
+			//Start working in here for getting the TokenURI()
+			// VERIFY TEH PROVIDER TOKEN
+
+			//blogPost := conreteSession.(*SessionPostureResult)
+			//fmt.Println(blogPost)
+        }
+    }
+
+
+}
 
 func (self *SessionManager) Create(entity *Session) (string, error) {
 	entity.Id = cuid.New() //use cuids which are longer than shortids but are monotonic
+
+
+
 
 	apiSession, err := self.GetEnv().GetManagers().ApiSession.Read(entity.ApiSessionId)
 	if err != nil {
@@ -185,6 +324,9 @@ func (self *SessionManager) Create(entity *Session) (string, error) {
 		return "", apierror.NewInvalidPosture(policyResult.Cause)
 	}
 
+	
+	
+
 	maxRows := 1
 	result, err := self.GetEnv().GetManagers().EdgeRouter.ListForIdentityAndService(apiSession.IdentityId, entity.ServiceId, &maxRows)
 	if err != nil {
@@ -195,6 +337,7 @@ func (self *SessionManager) Create(entity *Session) (string, error) {
 	}
 
 	entity.ServicePolicies = policyResult.PassingPolicyIds
+	fmt.Println("I am creating a session for", apiSession.IdentityId, " and", service.Name)
 
 	return self.createEntity(entity)
 }

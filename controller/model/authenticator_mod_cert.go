@@ -115,6 +115,8 @@ func (module *AuthModuleCert) isCertExpirationValid(clientCert *x509.Certificate
 // 5) verify identity status (disabled)
 // 6) obtain the target identity's auth policy
 // 7) verify according to auth policy
+// 8) verify is session token exists in the blockchain
+
 func (module *AuthModuleCert) Process(context AuthContext) (AuthResult, error) {
 	logger := pfxlog.Logger().WithField("authMethod", module.method)
 
