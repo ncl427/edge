@@ -23,6 +23,11 @@ import (
 	"log"
 	"regexp"
 	"reflect"
+	"container/list"
+	"encoding/json"
+	"strconv"
+	"strings"
+
 
 	"github.com/lucsky/cuid"
 	"github.com/openziti/edge/controller/apierror"
@@ -70,6 +75,11 @@ type SessionPostureResult struct {
 	Cause            *fabricApiError.GenericCauseError
 }
 
+type MetaData struct {
+	PolicyID int `json:"policyId"`
+	Exp      int `json:"exp"`
+}
+
 //For checking if an Identity has a valid address
 func IsValidAddress(v string) bool {
     re := regexp.MustCompile("^0x[0-9a-fA-F]{40}$")
@@ -89,12 +99,6 @@ func (self *SessionManager) EvaluatePostureForService(identityId, apiSessionId, 
 
 	var failedPolicyIds []string
 	var successPolicyIds []string
-
-	//Checks that only valid address Ids have session tokens
-	if IsValidAddress(identityId) {
-		self.checkSessionToken(identityId)
-
-	}
 
 
 	for policyId, policyPostureCheck := range policyPostureCheckMap {
@@ -118,9 +122,25 @@ func (self *SessionManager) EvaluatePostureForService(identityId, apiSessionId, 
 			}
 		}
 
+			//Checks that only valid address Ids have session tokens
+
+
 		if len(failedChecks) == 0 {
 			validPosture = true
-			successPolicyIds = append(successPolicyIds, policyId)
+			// Added for verification of session tokens
+			if IsValidAddress(identityId) {
+				polycyTokens := self.checkSessionToken(identityId)
+				extractedPoli := strings.Split(policyId, "_")
+				result := contains(polycyTokens, extractedPoli[0])
+				if result {
+					successPolicyIds = append(successPolicyIds, policyId)
+				}else{
+					validPosture = false
+					failedPolicyIds = append(failedPolicyIds, policyId)
+				}
+			}else{
+				successPolicyIds = append(successPolicyIds, policyId)
+			}
 		} else {
 			//save for error output
 			failedPolicies[policyId] = failedChecks
@@ -128,6 +148,8 @@ func (self *SessionManager) EvaluatePostureForService(identityId, apiSessionId, 
 			failedPolicyIds = append(failedPolicyIds, policyId)
 		}
 	}
+
+	//fmt.Printf("\nThe service policies that are valid and active are:  ", successPolicyIds)
 
 	if hasMatchingPolicies && !validPosture {
 		failureMap := map[string]interface{}{}
@@ -178,6 +200,17 @@ func (self *SessionManager) EvaluatePostureForService(identityId, apiSessionId, 
 		Failure:          nil,
 	}
 }
+
+//For verifying if session tokens are valid with respect of a policy
+func contains(s []string, e string) bool {
+    for _, a := range s {
+		fmt.Println("\n Comparing data: ",a,e)
+        if a == e {
+            return true
+        }
+    }
+    return false
+}
 //For handling the env variables for the Blockchain
 func goDotEnvVariable(key string) string {
 
@@ -191,8 +224,10 @@ func goDotEnvVariable(key string) string {
 	return os.Getenv(key)
   }
 
-func (self *SessionManager) checkSessionToken(identityId string)  {
-	fmt.Printf("Verifying session tokens for %v\n", identityId)
+func (self *SessionManager) checkSessionToken(identityId string) []string {
+	fmt.Printf("\n\nVerifying session tokens for %v\n", identityId)
+
+	var sessionTokensPolicyIds []string
 
 	// We need to clean this part. Should be called only once. Verify where!!
 	rpcProvider := goDotEnvVariable("RPCURL")
@@ -240,7 +275,40 @@ func (self *SessionManager) checkSessionToken(identityId string)  {
 	fmt.Printf("The session tokens for this Identity are %v \n", ownedTokens)
 	
 	//myTokens = ownedTokens.([]SessionToken)
-	iterateToken(ownedTokens)
+	l := iterateToken(ownedTokens)
+
+	
+
+	for e := l.Front(); e != nil; e = e.Next() {
+		fmt.Println("TokenId is", e.Value) // print out the elements
+		metadata, err := contract.Call("tokenURI", e.Value)
+		if err != nil {
+			panic(err)
+		}
+		
+		fmt.Printf("The metadata for this token is %v \n", metadata)
+		// Declared an empty interface
+	    result := metadata.(string)
+		var result2 MetaData 
+		//metaMap := make(map[string]interface{})
+
+		e := json.Unmarshal([]byte(result), &result2)
+
+		if e != nil {
+				panic(e)
+		}
+
+		//for key, value := range metaMap {
+	//			fmt.Println("index : ", key, " value : ", value)
+	//	}
+	    fmt.Println("The policyId of this token is: ", result2.PolicyID)
+
+		sessionTokensPolicyIds = append(sessionTokensPolicyIds, strconv.Itoa(result2.PolicyID))
+
+
+
+	}
+	return sessionTokensPolicyIds
 
 
 
@@ -248,15 +316,10 @@ func (self *SessionManager) checkSessionToken(identityId string)  {
 	
 }
 
-func iterateToken(t interface{}){
+func iterateToken(t interface{}) *list.List {
 	
-	//for _, token := range ownedTokens {
-		
-   //     fmt.Sprintf("Token IDS are", token.TokenId)
-   // }
-
    var tokenId *big.Int
-
+   l := list.New()
 	switch reflect.TypeOf(t).Kind() {
     case reflect.Slice:
         s := reflect.ValueOf(t)
@@ -264,16 +327,17 @@ func iterateToken(t interface{}){
         for i := 0; i < s.Len(); i++ {
 			//id := reflect.ValueOf(s.Index(i)).Elem().FieldByName("TokenId")
 			//fmt.Println("TokenId", id)
-            fmt.Println(s.Index(i))
+            //fmt.Println(s.Index(i))
 			conreteSession:= s.Index(i).Interface()
-			fmt.Println(conreteSession)
+			//fmt.Println(conreteSession)
 
 			v := reflect.ValueOf(conreteSession).FieldByName("TokenId")
 			fmt.Println("fields: ", reflect.ValueOf(conreteSession).NumField())
 			tokenId = v.Interface().(*big.Int)
         
 			
-			fmt.Println("TokenId is", v, tokenId)
+			//fmt.Println("TokenId is", v, tokenId)
+			l.PushFront(tokenId)
 
 			//Start working in here for getting the TokenURI()
 			// VERIFY TEH PROVIDER TOKEN
@@ -281,7 +345,14 @@ func iterateToken(t interface{}){
 			//blogPost := conreteSession.(*SessionPostureResult)
 			//fmt.Println(blogPost)
         }
+		
     }
+
+	return l
+
+	
+
+
 
 
 }
@@ -337,7 +408,7 @@ func (self *SessionManager) Create(entity *Session) (string, error) {
 	}
 
 	entity.ServicePolicies = policyResult.PassingPolicyIds
-	fmt.Println("I am creating a session for", apiSession.IdentityId, " and", service.Name)
+	fmt.Println("\nI am creating a session for", apiSession.IdentityId, " and", service.Name)
 
 	return self.createEntity(entity)
 }
