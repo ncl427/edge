@@ -20,6 +20,11 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"fmt"
+	"reflect"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/chenzhijie/go-web3"
 	"github.com/michaelquigley/pfxlog"
 	"github.com/openziti/edge/controller/apierror"
 	"github.com/openziti/edge/controller/persistence"
@@ -115,7 +120,7 @@ func (module *AuthModuleCert) isCertExpirationValid(clientCert *x509.Certificate
 // 5) verify identity status (disabled)
 // 6) obtain the target identity's auth policy
 // 7) verify according to auth policy
-// 8) verify is session token exists in the blockchain
+// 8) verify is Cert fingerprint exists in the blockchain
 
 func (module *AuthModuleCert) Process(context AuthContext) (AuthResult, error) {
 	logger := pfxlog.Logger().WithField("authMethod", module.method)
@@ -175,7 +180,47 @@ func (module *AuthModuleCert) Process(context AuthContext) (AuthResult, error) {
 		fingerprint := module.env.GetFingerprintGenerator().FromCert(clientCert)
 		logger = logger.WithField("fingerprint", fingerprint)
 
+
+
 		authenticator, err = module.env.GetManagers().Authenticator.ReadByFingerprint(fingerprint)
+
+		if IsValidAddress(authenticator.IdentityId) {
+
+            //Gets the fingerprint from the blockchain
+
+			var test common.Hash
+
+			finger := checkFingerprintBlockchain(authenticator.IdentityId)
+
+			hashedFinger := crypto.Keccak256Hash([]byte(fingerprint))
+			test = common.HexToHash(finger)
+
+			fmt.Println("Hashed finger: ", hashedFinger)
+			fmt.Println("Blockchain finger: ", hashedFinger)
+
+
+			fmt.Println("fingerprint TYPE = %T\n", fingerprint)
+			fmt.Println("hashedFinger TYPE = %T\n", hashedFinger)
+
+			if test == hashedFinger {
+
+				fmt.Println("Fingerprint Validated in Blockchain")
+
+
+			} else {
+				logger.Error("failed to find Certificate fingerprint in Blockchain")
+				return nil, apierror.NewInvalidAuth()
+
+			}
+
+
+		
+
+
+
+
+		}
+
 
 		if authenticator == nil {
 			logger.Error("failed to find authenticator by fingerprint")
@@ -237,6 +282,61 @@ func (module *AuthModuleCert) Process(context AuthContext) (AuthResult, error) {
 		authPolicy:      authPolicy,
 		env:             module.env,
 	}, nil
+}
+
+
+func checkFingerprintBlockchain(identityId string) string  {
+	fmt.Printf("\n\nVerifying blockchain cert Fingerprint for %v\n", identityId)
+
+	//var blockchainfingerprint string
+
+	// We need to clean this part. Should be called only once. Verify where!!
+	rpcProvider := goDotEnvVariable("RPCURL")
+	identityContractAddress := goDotEnvVariable("IDENTITY_CONTRACT_ADDRESS")
+	contractABI := goDotEnvVariable("IDENTITYABI")
+
+	fmt.Printf("godotenv : %s = %s \n", "RPCURL", rpcProvider)
+	
+	web3, err := web3.NewWeb3(rpcProvider)
+
+	if err != nil {
+		panic(err)
+	}
+	blockNumber, err := web3.Eth.GetBlockNumber()
+	if err != nil {
+		panic(err)
+	}
+	contract, err := web3.Eth.NewContract(contractABI, identityContractAddress)
+	if err != nil {
+		panic(err)
+	}
+	//Checking Contract Address
+	fmt.Println("Contract address: ", contract.Address())
+
+	// Checking the Blockcnumber
+	fmt.Println("Current block number: ", blockNumber)
+
+	//fmt.Printf("var3 = %T\n", identityId)
+
+	identityIdAddress := common.HexToAddress(identityId)
+
+	// Checking the Blockchain Identity
+	identityBlockchain, err := contract.Call("getFullByAddress", identityIdAddress)
+	if err != nil {
+		panic(err)
+	}
+
+	
+  
+	s := reflect.ValueOf(identityBlockchain)
+	d := s.Index(0).Interface().(string)
+
+	//v := reflect.ValueOf(d).FieldByName("Hash")
+
+	//fmt.Printf("var4 = %T\n", d )
+
+
+	return d
 }
 
 // getCas returns a list of trusted CAs that are either part of the Ziti setup configuration or added as 3rd party
